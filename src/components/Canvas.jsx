@@ -41,7 +41,12 @@ const DEFAULT_DIMS = {
 }
 
 function getTouchingSides(node, allNodes) {
-  const sides = { left: false, right: false, top: false, bottom: false }
+  // sides: hide the border on this side entirely
+  // corners: square this specific corner (only when the adjacent node covers it)
+  const ts = {
+    left: false, right: false, top: false, bottom: false,
+    topLeft: false, topRight: false, bottomLeft: false, bottomRight: false,
+  }
   const [dw, dh] = DEFAULT_DIMS[node.type] ?? [224, 96]
   const nL = node.position.x
   const nT = node.position.y
@@ -60,12 +65,28 @@ function getTouchingSides(node, allNodes) {
     const yOverlap = nB > oT + TOUCH_THRESHOLD && nT < oB - TOUCH_THRESHOLD
     const xOverlap = nR > oL + TOUCH_THRESHOLD && nL < oR - TOUCH_THRESHOLD
 
-    if (Math.abs(nL - oR) <= TOUCH_THRESHOLD && yOverlap) sides.left   = true
-    if (Math.abs(nR - oL) <= TOUCH_THRESHOLD && yOverlap) sides.right  = true
-    if (Math.abs(nT - oB) <= TOUCH_THRESHOLD && xOverlap) sides.top    = true
-    if (Math.abs(nB - oT) <= TOUCH_THRESHOLD && xOverlap) sides.bottom = true
+    if (Math.abs(nL - oR) <= TOUCH_THRESHOLD && yOverlap) {
+      ts.left = true
+      if (oT <= nT + TOUCH_THRESHOLD) ts.topLeft    = true
+      if (oB >= nB - TOUCH_THRESHOLD) ts.bottomLeft  = true
+    }
+    if (Math.abs(nR - oL) <= TOUCH_THRESHOLD && yOverlap) {
+      ts.right = true
+      if (oT <= nT + TOUCH_THRESHOLD) ts.topRight   = true
+      if (oB >= nB - TOUCH_THRESHOLD) ts.bottomRight = true
+    }
+    if (Math.abs(nT - oB) <= TOUCH_THRESHOLD && xOverlap) {
+      ts.top = true
+      if (oL <= nL + TOUCH_THRESHOLD) ts.topLeft  = true
+      if (oR >= nR - TOUCH_THRESHOLD) ts.topRight = true
+    }
+    if (Math.abs(nB - oT) <= TOUCH_THRESHOLD && xOverlap) {
+      ts.bottom = true
+      if (oL <= nL + TOUCH_THRESHOLD) ts.bottomLeft  = true
+      if (oR >= nR - TOUCH_THRESHOLD) ts.bottomRight = true
+    }
   }
-  return sides
+  return ts
 }
 
 export default function Canvas() {

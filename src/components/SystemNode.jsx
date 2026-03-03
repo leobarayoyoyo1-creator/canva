@@ -96,13 +96,14 @@ export default function SystemNode({ data, selected, width }) {
               : hovered
               ? `${category.color}60`
               : 'rgba(255,255,255,0.07)',
-            borderTopLeftRadius:     (ts.left  || ts.top)    ? 0 : 12,
-            borderTopRightRadius:    (ts.right || ts.top)    ? 0 : 12,
-            borderBottomRightRadius: (ts.right || ts.bottom) ? 0 : 12,
-            borderBottomLeftRadius:  (ts.left  || ts.bottom) ? 0 : 12,
+            borderTopLeftRadius:     ts.topLeft     ? 0 : 12,
+            borderTopRightRadius:    ts.topRight    ? 0 : 12,
+            borderBottomRightRadius: ts.bottomRight ? 0 : 12,
+            borderBottomLeftRadius:  ts.bottomLeft  ? 0 : 12,
             background: '#1e1e2e',
+            // Remove the 1px glow ring on touching sides — it bleeds through the junction
             boxShadow: hovered || selected
-              ? `0 0 0 1px ${category.color}20, 0 10px 36px #00000065`
+              ? `0 10px 36px #00000065`
               : '0 4px 16px #00000040',
             transition: 'border-color 0.15s, box-shadow 0.15s, border-radius 0.1s',
           }}
