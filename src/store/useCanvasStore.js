@@ -18,8 +18,8 @@ export const STATUSES = {
 export const PRIMARY_COLOR = '#6366f1'
 
 const EDGE_STYLE = {
-  type: 'smoothstep',
-  style: { stroke: PRIMARY_COLOR, strokeWidth: 2 },
+  type: 'system',
+  data: { label: '' },
   markerEnd: { type: MarkerType.ArrowClosed, color: PRIMARY_COLOR },
 }
 
@@ -36,9 +36,15 @@ function loadFromStorage() {
   try {
     const nodes = localStorage.getItem('canvas-nodes')
     const edges = localStorage.getItem('canvas-edges')
+    const parsedEdges = edges ? JSON.parse(edges) : []
     return {
       nodes: nodes ? JSON.parse(nodes) : INITIAL_NODES,
-      edges: edges ? JSON.parse(edges) : [],
+      // migra edges antigas para o tipo customizado
+      edges: parsedEdges.map((e) => ({
+        ...e,
+        type: 'system',
+        data: { label: e.data?.label ?? '' },
+      })),
     }
   } catch (e) {
     console.warn('Erro ao carregar canvas do localStorage:', e)
@@ -126,6 +132,12 @@ export function useCanvasStore() {
     closeContextMenu()
   }, [closeModal, closeContextMenu])
 
+  const updateEdge = useCallback((id, patch) => {
+    setEdges((eds) =>
+      eds.map((e) => (e.id === id ? { ...e, data: { ...e.data, ...patch } } : e))
+    )
+  }, [])
+
   const updateNode = useCallback((id, data) => {
     setNodes((nds) =>
       nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n))
@@ -168,6 +180,7 @@ export function useCanvasStore() {
     modal, openAddModal, openEditModal, closeModal,
     contextMenu, openContextMenu, closeContextMenu,
     addNode, updateNode, deleteNode,
+    updateEdge,
     addStickyNote, updateStickyNote,
   }
 }

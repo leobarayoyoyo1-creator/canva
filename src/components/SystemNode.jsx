@@ -11,6 +11,53 @@ const CATEGORY_ICONS = {
   other:    Box,
 }
 
+// Área de clique invisível maior que o visual, para facilitar arrastar a conexão
+function ConnectionHandle({ type, position, color, visible }) {
+  return (
+    <div className="relative" style={{ position: 'absolute', ...HANDLE_ANCHOR[position] }}>
+      {/* Hit area invisível e grande */}
+      <Handle
+        type={type}
+        position={position}
+        style={{
+          width: 28,
+          height: 28,
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10,
+          cursor: 'crosshair',
+        }}
+      />
+      {/* Visual do handle */}
+      <div
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: '50%',
+          background: '#13131f',
+          border: `2.5px solid ${color}`,
+          boxShadow: visible ? `0 0 0 3px ${color}25, 0 0 10px ${color}50` : 'none',
+          opacity: visible ? 1 : 0,
+          transform: `scale(${visible ? 1 : 0.4})`,
+          transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
+// Posicionamento dos handles nas bordas do node
+const HANDLE_ANCHOR = {
+  [Position.Left]:  { left: -7,  top: '50%', transform: 'translateY(-50%)' },
+  [Position.Right]: { right: -7, top: '50%', transform: 'translateY(-50%)' },
+}
+
 export default function SystemNode({ data }) {
   const [hovered, setHovered] = useState(false)
 
@@ -24,25 +71,17 @@ export default function SystemNode({ data }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          width: 10,
-          height: 10,
-          background: category.color,
-          border: '2px solid #1e1e2e',
-          opacity: hovered ? 1 : 0,
-          transition: 'opacity 0.15s',
-        }}
-      />
+      <ConnectionHandle type="target" position={Position.Left}  color={category.color} visible={hovered} />
+      <ConnectionHandle type="source" position={Position.Right} color={category.color} visible={hovered} />
 
       <div
-        className="w-56 rounded-xl overflow-hidden shadow-xl border transition-all duration-150"
+        className="w-56 rounded-xl overflow-hidden border transition-all duration-150"
         style={{
-          borderColor: hovered ? category.color : 'rgba(255,255,255,0.07)',
+          borderColor: hovered ? `${category.color}80` : 'rgba(255,255,255,0.07)',
           background: '#1e1e2e',
-          boxShadow: hovered ? `0 0 0 1px ${category.color}40, 0 8px 24px #00000050` : '0 4px 16px #00000040',
+          boxShadow: hovered
+            ? `0 0 0 1px ${category.color}30, 0 8px 32px #00000060`
+            : '0 4px 16px #00000040',
         }}
       >
         <div className="h-1" style={{ background: category.color }} />
@@ -79,39 +118,26 @@ export default function SystemNode({ data }) {
         </div>
       </div>
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          width: 10,
-          height: 10,
-          background: category.color,
-          border: '2px solid #1e1e2e',
-          opacity: hovered ? 1 : 0,
-          transition: 'opacity 0.15s',
-          right: -5,
-        }}
-      />
-
+      {/* Botão + para adicionar node conectado — separado do handle por distância suficiente */}
       <button
         onClick={(e) => {
           e.stopPropagation()
           data.onAddNear?.()
         }}
-        className="absolute top-1/2 flex items-center justify-center rounded-full text-white shadow-lg transition-all duration-150"
+        className="absolute top-1/2 flex items-center justify-center rounded-full text-white shadow-xl transition-all duration-200"
         style={{
-          width: 22,
-          height: 22,
-          right: -30,
-          transform: 'translateY(-50%)',
+          width: 24,
+          height: 24,
+          right: -46,
+          transform: `translateY(-50%) scale(${hovered ? 1 : 0.5})`,
           background: PRIMARY_COLOR,
           opacity: hovered ? 1 : 0,
           pointerEvents: hovered ? 'auto' : 'none',
-          scale: hovered ? '1' : '0.7',
+          boxShadow: `0 0 12px ${PRIMARY_COLOR}60`,
         }}
         title="Adicionar sistema conectado"
       >
-        <Plus size={12} />
+        <Plus size={13} />
       </button>
     </div>
   )

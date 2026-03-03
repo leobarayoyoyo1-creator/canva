@@ -7,9 +7,11 @@ import {
   MiniMap,
   useReactFlow,
   SelectionMode,
+  ConnectionLineType,
 } from '@xyflow/react'
 import { Plus } from 'lucide-react'
 import SystemNode from './SystemNode'
+import SystemEdge from './SystemEdge'
 import StickyNote from './StickyNote'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
@@ -20,6 +22,10 @@ const nodeTypes = {
   stickyNote: StickyNote,
 }
 
+const edgeTypes = {
+  system: SystemEdge,
+}
+
 export default function Canvas() {
   const {
     nodes, edges,
@@ -27,6 +33,7 @@ export default function Canvas() {
     modal, openAddModal, openEditModal, closeModal,
     contextMenu, openContextMenu, closeContextMenu,
     addNode, updateNode, deleteNode,
+    updateEdge,
     addStickyNote, updateStickyNote,
   } = useCanvasStore()
 
@@ -62,6 +69,15 @@ export default function Canvas() {
     [nodes, getNode, openAddModal, updateStickyNote]
   )
 
+  // Injeta updateEdge nos dados das arestas
+  const edgesWithCallbacks = useMemo(
+    () => edges.map((e) => ({
+      ...e,
+      data: { ...e.data, onUpdate: updateEdge },
+    })),
+    [edges, updateEdge]
+  )
+
   const onPaneContextMenu = useCallback(
     (e) => {
       e.preventDefault()
@@ -86,11 +102,18 @@ export default function Canvas() {
     <div className="w-full h-full bg-[#13131f]" onClick={closeContextMenu}>
       <ReactFlow
         nodes={nodesWithCallbacks}
-        edges={edges}
+        edges={edgesWithCallbacks}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{
+          stroke: `${PRIMARY_COLOR}90`,
+          strokeWidth: 2,
+          strokeDasharray: '6 4',
+        }}
         fitView
         fitViewOptions={{ padding: 0.4 }}
         minZoom={0.15}
