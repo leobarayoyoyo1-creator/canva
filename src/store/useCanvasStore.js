@@ -16,6 +16,7 @@ export const STATUSES = {
 }
 
 export const PRIMARY_COLOR = '#6366f1'
+export const SNAP_GRID     = 16
 
 const EDGE_STYLE = {
   type: 'system',
@@ -24,7 +25,7 @@ const EDGE_STYLE = {
 }
 
 const DEFAULT_NODE_WIDTH  = 224
-const DEFAULT_NODE_HEIGHT = 88
+const DEFAULT_NODE_HEIGHT = 96   // 96 = 3 × 32 → center always on 16px grid
 
 const INITIAL_NODES = [
   {

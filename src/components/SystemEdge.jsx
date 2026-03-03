@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
 import { PRIMARY_COLOR } from '../store/useCanvasStore'
 
 export default function SystemEdge({
@@ -13,10 +13,9 @@ export default function SystemEdge({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
-    borderRadius: 14,
   })
 
   const label = data?.label ?? ''

@@ -16,7 +16,7 @@ import StickyNote from './StickyNote'
 import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
-import { useCanvasStore, CATEGORIES, PRIMARY_COLOR } from '../store/useCanvasStore'
+import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID } from '../store/useCanvasStore'
 
 const nodeTypes = {
   systemNode: SystemNode,
@@ -27,7 +27,6 @@ const edgeTypes = {
   system: SystemEdge,
 }
 
-const SNAP_GRID = 16
 // Threshold para ativar guia de alinhamento (em coordenadas de flow)
 const GUIDE_THRESHOLD = 6
 
@@ -173,7 +172,7 @@ export default function Canvas() {
         edgeTypes={edgeTypes}
         snapToGrid
         snapGrid={[SNAP_GRID, SNAP_GRID]}
-        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineType={ConnectionLineType.Bezier}
         connectionLineStyle={{
           stroke: `${PRIMARY_COLOR}90`,
           strokeWidth: 2,
