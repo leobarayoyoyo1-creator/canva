@@ -1,16 +1,35 @@
-# React + Vite
+# canvas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+uma ferramenta visual pra mapear arquitetura de sistemas. a ideia é parecida com o n8n mas o foco é diferente — quero conseguir organizar visualmente como os sistemas de um ambiente se conectam, sem precisar de planilha ou draw.io.
 
-Currently, two official plugins are available:
+ainda tá no começo mas já dá pra usar.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## o que tem até agora
 
-## React Compiler
+- canvas com zoom e pan (botão do scroll pra arrastar, scroll pra zoom)
+- nodes representando sistemas, com categoria e status
+- conexões entre nodes arrastando de um handle pra outro
+- botão direito no canvas pra adicionar sistema ou nota
+- botão direito no node pra editar ou deletar
+- notas adesivas colapsáveis direto no canvas
+- seleção de área com botão esquerdo
+- tudo salvo no localStorage, não perde nada ao recarregar
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## rodando
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+abre em `http://localhost:5173`
+
+## stack
+
+- React + Vite
+- React Flow (@xyflow/react)
+- Tailwind CSS v4
+
+## próximos passos
+
+ainda tem muita coisa que quero adicionar. isso aqui é só a base visual.
