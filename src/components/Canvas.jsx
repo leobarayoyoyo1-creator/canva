@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -13,6 +13,7 @@ import { Plus } from 'lucide-react'
 import SystemNode from './SystemNode'
 import SystemEdge from './SystemEdge'
 import StickyNote from './StickyNote'
+import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
 import { useCanvasStore, CATEGORIES, PRIMARY_COLOR } from '../store/useCanvasStore'
@@ -25,6 +26,10 @@ const nodeTypes = {
 const edgeTypes = {
   system: SystemEdge,
 }
+
+const SNAP_GRID = 16
+// Threshold para ativar guia de alinhamento (em coordenadas de flow)
+const GUIDE_THRESHOLD = 6
 
 export default function Canvas() {
   const {
@@ -39,6 +44,8 @@ export default function Canvas() {
 
   const { getNode, screenToFlowPosition } = useReactFlow()
 
+  const [guides, setGuides] = useState([])
+
   // Injeta callbacks nos dados dos nodes sem serializar funções no estado
   const nodesWithCallbacks = useMemo(
     () =>
@@ -51,7 +58,7 @@ export default function Canvas() {
               onAddNear: () => {
                 const node = getNode(n.id)
                 const pos = node
-                  ? { x: node.position.x + 260, y: node.position.y }
+                  ? { x: node.position.x + (node.measured?.width ?? 224) + 48, y: node.position.y }
                   : null
                 openAddModal(pos, n.id)
               },
@@ -69,7 +76,6 @@ export default function Canvas() {
     [nodes, getNode, openAddModal, updateStickyNote]
   )
 
-  // Injeta updateEdge nos dados das arestas
   const edgesWithCallbacks = useMemo(
     () => edges.map((e) => ({
       ...e,
@@ -77,6 +83,63 @@ export default function Canvas() {
     })),
     [edges, updateEdge]
   )
+
+  // Detecta alinhamento durante drag e gera guias visuais
+  const onNodeDrag = useCallback((_, draggingNode) => {
+    if (draggingNode.type !== 'systemNode') return
+
+    const others = nodes.filter(
+      (n) => n.id !== draggingNode.id && n.type === 'systemNode'
+    )
+
+    const dw = draggingNode.measured?.width  ?? 224
+    const dh = draggingNode.measured?.height ?? 80
+    const dx = draggingNode.position.x
+    const dy = draggingNode.position.y
+
+    const newGuides = []
+
+    const addGuide = (type, position) => {
+      if (!newGuides.find((g) => g.type === type && g.position === position)) {
+        newGuides.push({ type, position })
+      }
+    }
+
+    for (const other of others) {
+      const ow = other.measured?.width  ?? 224
+      const oh = other.measured?.height ?? 80
+      const ox = other.position.x
+      const oy = other.position.y
+
+      // Alinhamento vertical (guias na horizontal — topo, centro, base)
+      const yAlignments = [
+        [dy,          oy],            // topo com topo
+        [dy + dh,     oy + oh],       // base com base
+        [dy + dh / 2, oy + oh / 2],   // centro com centro
+        [dy,          oy + oh],       // topo com base
+        [dy + dh,     oy],            // base com topo
+      ]
+      for (const [a, b] of yAlignments) {
+        if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('horizontal', b)
+      }
+
+      // Alinhamento horizontal (guias na vertical — esquerda, centro, direita)
+      const xAlignments = [
+        [dx,          ox],            // esquerda com esquerda
+        [dx + dw,     ox + ow],       // direita com direita
+        [dx + dw / 2, ox + ow / 2],   // centro com centro
+        [dx,          ox + ow],       // esquerda com direita
+        [dx + dw,     ox],            // direita com esquerda
+      ]
+      for (const [a, b] of xAlignments) {
+        if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('vertical', b)
+      }
+    }
+
+    setGuides(newGuides)
+  }, [nodes])
+
+  const onNodeDragStop = useCallback(() => setGuides([]), [])
 
   const onPaneContextMenu = useCallback(
     (e) => {
@@ -99,7 +162,7 @@ export default function Canvas() {
   const modalNode = modal.nodeId ? nodes.find((n) => n.id === modal.nodeId) : null
 
   return (
-    <div className="w-full h-full bg-[#13131f]" onClick={closeContextMenu}>
+    <div className="relative w-full h-full bg-[#13131f]" onClick={closeContextMenu}>
       <ReactFlow
         nodes={nodesWithCallbacks}
         edges={edgesWithCallbacks}
@@ -108,12 +171,16 @@ export default function Canvas() {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        snapToGrid
+        snapGrid={[SNAP_GRID, SNAP_GRID]}
         connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineStyle={{
           stroke: `${PRIMARY_COLOR}90`,
           strokeWidth: 2,
           strokeDasharray: '6 4',
         }}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         fitView
         fitViewOptions={{ padding: 0.4 }}
         minZoom={0.15}
@@ -128,9 +195,9 @@ export default function Canvas() {
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={24}
-          size={1}
-          color="#ffffff15"
+          gap={SNAP_GRID}
+          size={1.5}
+          color="#ffffff18"
         />
 
         <Controls
@@ -158,6 +225,8 @@ export default function Canvas() {
           </button>
         </div>
       </ReactFlow>
+
+      <GuideLines guides={guides} />
 
       {contextMenu.open && (
         <ContextMenu

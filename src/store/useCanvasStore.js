@@ -23,11 +23,15 @@ const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, color: PRIMARY_COLOR },
 }
 
+const DEFAULT_NODE_WIDTH  = 224
+const DEFAULT_NODE_HEIGHT = 88
+
 const INITIAL_NODES = [
   {
     id: '1',
     type: 'systemNode',
     position: { x: 300, y: 200 },
+    style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
     data: { name: 'API Gateway', category: 'api', status: 'active' },
   },
 ]
@@ -38,7 +42,12 @@ function loadFromStorage() {
     const edges = localStorage.getItem('canvas-edges')
     const parsedEdges = edges ? JSON.parse(edges) : []
     return {
-      nodes: nodes ? JSON.parse(nodes) : INITIAL_NODES,
+      nodes: nodes
+        ? JSON.parse(nodes).map((n) => ({
+            ...n,
+            style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, ...n.style },
+          }))
+        : INITIAL_NODES,
       // migra edges antigas para o tipo customizado
       edges: parsedEdges.map((e) => ({
         ...e,
@@ -119,6 +128,7 @@ export function useCanvasStore() {
       id: newId,
       type: 'systemNode',
       position: position ?? { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 },
+      style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
       data: { name, category, status },
     }
     setNodes((nds) => [...nds, newNode])
