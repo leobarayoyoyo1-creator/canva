@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -13,6 +13,7 @@ import { Plus } from 'lucide-react'
 import SystemNode from './SystemNode'
 import SystemEdge from './SystemEdge'
 import StickyNote from './StickyNote'
+import TextCard from './TextCard'
 import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
@@ -21,6 +22,7 @@ import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID } from '../store/u
 const nodeTypes = {
   systemNode: SystemNode,
   stickyNote: StickyNote,
+  textCard:   TextCard,
 }
 
 const edgeTypes = {
@@ -29,6 +31,42 @@ const edgeTypes = {
 
 // Threshold para ativar guia de alinhamento (em coordenadas de flow)
 const GUIDE_THRESHOLD = 6
+
+// Returns which sides of `node` are touching another systemNode or textCard.
+// Used to merge borders visually when nodes are adjacent.
+const TOUCH_THRESHOLD = 2   // px tolerance for floating-point positions
+const DEFAULT_DIMS = {
+  systemNode: [224, 96],
+  textCard:   [240, 160],
+}
+
+function getTouchingSides(node, allNodes) {
+  const sides = { left: false, right: false, top: false, bottom: false }
+  const [dw, dh] = DEFAULT_DIMS[node.type] ?? [224, 96]
+  const nL = node.position.x
+  const nT = node.position.y
+  const nR = nL + (node.measured?.width  ?? dw)
+  const nB = nT + (node.measured?.height ?? dh)
+
+  for (const other of allNodes) {
+    if (other.id === node.id) continue
+    if (other.type !== 'systemNode' && other.type !== 'textCard') continue
+    const [ow, oh] = DEFAULT_DIMS[other.type] ?? [224, 96]
+    const oL = other.position.x
+    const oT = other.position.y
+    const oR = oL + (other.measured?.width  ?? ow)
+    const oB = oT + (other.measured?.height ?? oh)
+
+    const yOverlap = nB > oT + TOUCH_THRESHOLD && nT < oB - TOUCH_THRESHOLD
+    const xOverlap = nR > oL + TOUCH_THRESHOLD && nL < oR - TOUCH_THRESHOLD
+
+    if (Math.abs(nL - oR) <= TOUCH_THRESHOLD && yOverlap) sides.left   = true
+    if (Math.abs(nR - oL) <= TOUCH_THRESHOLD && yOverlap) sides.right  = true
+    if (Math.abs(nT - oB) <= TOUCH_THRESHOLD && xOverlap) sides.top    = true
+    if (Math.abs(nB - oT) <= TOUCH_THRESHOLD && xOverlap) sides.bottom = true
+  }
+  return sides
+}
 
 export default function Canvas() {
   const {
@@ -39,6 +77,7 @@ export default function Canvas() {
     addNode, updateNode, deleteNode,
     updateEdge,
     addStickyNote, updateStickyNote,
+    addTextCard, snapTextCardGrid, placeCardAtEdge, snapCardColor,
     snapNodeToGrid,
     copySelected, pasteClipboard,
     undo, redo,
@@ -47,6 +86,9 @@ export default function Canvas() {
   const { getNode, screenToFlowPosition } = useReactFlow()
 
   const [guides, setGuides] = useState([])
+
+  // Tracks last snapped color per textCard during drag — avoids redundant setNodes calls
+  const snapColorRef = useRef({})
 
   // Global keyboard shortcuts (copy, paste, undo, redo)
   useEffect(() => {
@@ -72,6 +114,7 @@ export default function Canvas() {
             ...n,
             data: {
               ...n.data,
+              touchingSides: getTouchingSides(n, nodes),
               onAddNear: () => {
                 const node = getNode(n.id)
                 const pos = node
@@ -89,9 +132,20 @@ export default function Canvas() {
             data: { ...n.data, onUpdate: updateStickyNote },
           }
         }
+        if (n.type === 'textCard') {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              touchingSides: getTouchingSides(n, nodes),
+              onUpdate: updateStickyNote,
+              onResizeEnd: (x, y, w, h) => snapTextCardGrid(n.id, x, y, w, h),
+            },
+          }
+        }
         return n
       }),
-    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid]
+    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid, snapTextCardGrid]
   )
 
   const edgesWithCallbacks = useMemo(
@@ -102,62 +156,156 @@ export default function Canvas() {
     [edges, updateEdge]
   )
 
-  // Detecta alinhamento durante drag e gera guias visuais
+  // Detecta alinhamento durante drag e gera guias visuais.
+  // Para textCards, detecta color-snap com nodes/cards tocados.
   const onNodeDrag = useCallback((_, draggingNode) => {
-    if (draggingNode.type !== 'systemNode') return
+    // ── Alignment guides (systemNode only) ──────────────────────────────────
+    if (draggingNode.type === 'systemNode') {
+      const others = nodes.filter(
+        (n) => n.id !== draggingNode.id && n.type === 'systemNode'
+      )
 
-    const others = nodes.filter(
-      (n) => n.id !== draggingNode.id && n.type === 'systemNode'
-    )
+      const dw = draggingNode.measured?.width  ?? 224
+      const dh = draggingNode.measured?.height ?? 80
+      const dx = draggingNode.position.x
+      const dy = draggingNode.position.y
 
-    const dw = draggingNode.measured?.width  ?? 224
-    const dh = draggingNode.measured?.height ?? 80
-    const dx = draggingNode.position.x
-    const dy = draggingNode.position.y
-
-    const newGuides = []
-
-    const addGuide = (type, position) => {
-      if (!newGuides.find((g) => g.type === type && g.position === position)) {
-        newGuides.push({ type, position })
+      const newGuides = []
+      const addGuide = (type, position) => {
+        if (!newGuides.find((g) => g.type === type && g.position === position)) {
+          newGuides.push({ type, position })
+        }
       }
+
+      for (const other of others) {
+        const ow = other.measured?.width  ?? 224
+        const oh = other.measured?.height ?? 80
+        const ox = other.position.x
+        const oy = other.position.y
+
+        const yAlignments = [
+          [dy,          oy],
+          [dy + dh,     oy + oh],
+          [dy + dh / 2, oy + oh / 2],
+          [dy,          oy + oh],
+          [dy + dh,     oy],
+        ]
+        for (const [a, b] of yAlignments) {
+          if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('horizontal', b)
+        }
+
+        const xAlignments = [
+          [dx,          ox],
+          [dx + dw,     ox + ow],
+          [dx + dw / 2, ox + ow / 2],
+          [dx,          ox + ow],
+          [dx + dw,     ox],
+        ]
+        for (const [a, b] of xAlignments) {
+          if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('vertical', b)
+        }
+      }
+
+      setGuides(newGuides)
+      return
     }
 
-    for (const other of others) {
-      const ow = other.measured?.width  ?? 224
-      const oh = other.measured?.height ?? 80
-      const ox = other.position.x
-      const oy = other.position.y
+    // ── Color snap (textCard only) ───────────────────────────────────────────
+    if (draggingNode.type === 'textCard') {
+      const dL = draggingNode.position.x
+      const dT = draggingNode.position.y
+      const dR = dL + (draggingNode.measured?.width  ?? 240)
+      const dB = dT + (draggingNode.measured?.height ?? 160)
 
-      // Alinhamento vertical (guias na horizontal — topo, centro, base)
-      const yAlignments = [
-        [dy,          oy],            // topo com topo
-        [dy + dh,     oy + oh],       // base com base
-        [dy + dh / 2, oy + oh / 2],   // centro com centro
-        [dy,          oy + oh],       // topo com base
-        [dy + dh,     oy],            // base com topo
-      ]
-      for (const [a, b] of yAlignments) {
-        if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('horizontal', b)
+      const touches = (n) => {
+        const nL = n.position.x
+        const nT = n.position.y
+        const nR = nL + (n.measured?.width  ?? (n.type === 'textCard' ? 240 : 224))
+        const nB = nT + (n.measured?.height ?? (n.type === 'textCard' ? 160 :  96))
+        return dL <= nR && dR >= nL && dT <= nB && dB >= nT
       }
 
-      // Alinhamento horizontal (guias na vertical — esquerda, centro, direita)
-      const xAlignments = [
-        [dx,          ox],            // esquerda com esquerda
-        [dx + dw,     ox + ow],       // direita com direita
-        [dx + dw / 2, ox + ow / 2],   // centro com centro
-        [dx,          ox + ow],       // esquerda com direita
-        [dx + dw,     ox],            // direita com esquerda
-      ]
-      for (const [a, b] of xAlignments) {
-        if (Math.abs(a - b) <= GUIDE_THRESHOLD) addGuide('vertical', b)
+      // Priority 1: systemNode (use category color)
+      let snapColor = null
+      for (const n of nodes) {
+        if (n.id === draggingNode.id || n.type !== 'systemNode') continue
+        if (touches(n)) {
+          snapColor = CATEGORIES[n.data?.category]?.color ?? CATEGORIES.other.color
+          break
+        }
+      }
+
+      // Priority 2: another textCard
+      if (!snapColor) {
+        for (const n of nodes) {
+          if (n.id === draggingNode.id || n.type !== 'textCard') continue
+          if (touches(n)) {
+            snapColor = n.data?.accentColor ?? PRIMARY_COLOR
+            break
+          }
+        }
+      }
+
+      // Only call setNodes when color actually changes
+      const prev = snapColorRef.current[draggingNode.id]
+      if (snapColor && snapColor !== prev) {
+        snapColorRef.current[draggingNode.id] = snapColor
+        snapCardColor(draggingNode.id, snapColor)
       }
     }
+  }, [nodes, snapCardColor])
 
-    setGuides(newGuides)
-  }, [nodes])
+  const onNodeDragStop = useCallback((_, node) => {
+    setGuides([])
 
-  const onNodeDragStop = useCallback(() => setGuides([]), [])
+    if (node?.type !== 'textCard') return
+    delete snapColorRef.current[node.id]
+
+    // Edge snap: if the card overlaps any systemNode or textCard, push it to
+    // exact edge contact using the axis of minimum penetration.
+    const cL = node.position.x
+    const cT = node.position.y
+    const cW = node.measured?.width  ?? 240
+    const cH = node.measured?.height ?? 160
+    const cR = cL + cW
+    const cB = cT + cH
+
+    let bestX = null
+    let bestY = null
+    let minPen = Infinity
+
+    for (const n of nodes) {
+      if (n.id === node.id) continue
+      if (n.type !== 'systemNode' && n.type !== 'textCard') continue
+
+      const nL = n.position.x
+      const nT = n.position.y
+      const nW = n.measured?.width  ?? (n.type === 'textCard' ? 240 : 224)
+      const nH = n.measured?.height ?? (n.type === 'textCard' ? 160 :  96)
+      const nR = nL + nW
+      const nB = nT + nH
+
+      // Skip if not overlapping
+      if (cR <= nL || cL >= nR || cB <= nT || cT >= nB) continue
+
+      // Penetration depth on each axis
+      const dL = cR - nL   // push card left:  card.right aligns to node.left
+      const dR = nR - cL   // push card right: card.left  aligns to node.right
+      const dT = cB - nT   // push card up:    card.bottom aligns to node.top
+      const dB = nB - cT   // push card down:  card.top   aligns to node.bottom
+
+      const pen = Math.min(dL, dR, dT, dB)
+      if (pen >= minPen) continue
+      minPen = pen
+
+      if      (pen === dL) { bestX = nL - cW; bestY = cT }
+      else if (pen === dR) { bestX = nR;       bestY = cT }
+      else if (pen === dT) { bestX = cL;       bestY = nT - cH }
+      else                 { bestX = cL;       bestY = nB }
+    }
+
+    if (bestX !== null) placeCardAtEdge(node.id, bestX, bestY)
+  }, [nodes, placeCardAtEdge])
 
   const onPaneContextMenu = useCallback(
     (e) => {
@@ -172,7 +320,8 @@ export default function Canvas() {
     (e, node) => {
       e.preventDefault()
       if (node.type === 'stickyNote') return
-      openContextMenu(e.clientX, e.clientY, 'node', null, node.id)
+      const menuType = node.type === 'textCard' ? 'textCard' : 'node'
+      openContextMenu(e.clientX, e.clientY, menuType, null, node.id)
     },
     [openContextMenu]
   )
@@ -226,6 +375,7 @@ export default function Canvas() {
         <MiniMap
           nodeColor={(n) => {
             if (n.type === 'stickyNote') return '#fde047'
+            if (n.type === 'textCard')   return n.data?.accentColor ?? PRIMARY_COLOR
             return CATEGORIES[n.data?.category]?.color ?? CATEGORIES.other.color
           }}
           maskColor="rgba(0,0,0,0.6)"
@@ -255,6 +405,7 @@ export default function Canvas() {
             closeContextMenu()
             openAddModal(contextMenu.flowPosition)
           }}
+          onAddCard={() => addTextCard(contextMenu.flowPosition)}
           onAddNote={() => addStickyNote(contextMenu.flowPosition)}
           onEdit={() => {
             closeContextMenu()

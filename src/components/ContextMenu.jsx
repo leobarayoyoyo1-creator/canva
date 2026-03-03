@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { Server, StickyNote, Pencil, Trash2 } from 'lucide-react'
+import { Server, StickyNote, LayoutGrid, Pencil, Trash2 } from 'lucide-react'
 
-export default function ContextMenu({ x, y, type, onAddSystem, onAddNote, onEdit, onDelete, onClose }) {
+export default function ContextMenu({ x, y, type, onAddSystem, onAddNote, onAddCard, onEdit, onDelete, onClose }) {
   const ref = useRef()
 
   useEffect(() => {
@@ -28,9 +28,12 @@ export default function ContextMenu({ x, y, type, onAddSystem, onAddNote, onEdit
     >
       {type === 'pane' ? (
         <>
-          <MenuItem icon={Server} label="Adicionar Sistema" onClick={onAddSystem} />
-          <MenuItem icon={StickyNote} label="Adicionar Nota" onClick={onAddNote} />
+          <MenuItem icon={Server}     label="Adicionar Sistema" onClick={onAddSystem} />
+          <MenuItem icon={LayoutGrid} label="Adicionar Cartão"  onClick={onAddCard} />
+          <MenuItem icon={StickyNote} label="Adicionar Nota"    onClick={onAddNote} />
         </>
+      ) : type === 'textCard' ? (
+        <MenuItem icon={Trash2} label="Deletar Cartão" onClick={onDelete} danger />
       ) : (
         <>
           <MenuItem icon={Pencil} label="Editar Sistema" onClick={onEdit} />

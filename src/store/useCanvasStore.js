@@ -320,6 +320,60 @@ export function useCanvasStore() {
     )
   }, [])
 
+  // Text card
+  const addTextCard = useCallback((position) => {
+    snapshot()
+    const snap16 = (v) => Math.round(v / SNAP_GRID) * SNAP_GRID
+    const pos = position ?? { x: 288, y: 288 }
+    const newId = String(idRef.current++)
+    setNodes((nds) => [
+      ...nds,
+      {
+        id: newId,
+        type: 'textCard',
+        position: { x: snap16(pos.x), y: snap16(pos.y) },
+        style: { width: 240, height: 160 },
+        connectable: false,
+        data: {
+          text: '',
+          fontSize: 14,
+          textColor: '#e2e8f0',
+          bgColor: '#1e1e2e',
+          accentColor: PRIMARY_COLOR,
+        },
+      },
+    ])
+    closeContextMenu()
+  }, [snapshot, closeContextMenu])
+
+  // TextCard resize snap — uses snap16 for all values (not snap32 like systemNodes)
+  const snapTextCardGrid = useCallback((id, x, y, w, h) => {
+    const snap16 = (v) => Math.round(v / SNAP_GRID) * SNAP_GRID
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id !== id ? n : {
+          ...n,
+          position: { x: snap16(x), y: snap16(y) },
+          style: { ...n.style, width: snap16(w), height: snap16(h) },
+        }
+      )
+    )
+  }, [])
+
+  // Moves a textCard to an exact position (edge snap on drag stop) — no snapshot
+  const placeCardAtEdge = useCallback((id, x, y) => {
+    setNodes((nds) =>
+      nds.map((n) => (n.id === id ? { ...n, position: { x, y } } : n))
+    )
+  }, [])
+
+  // Updates accentColor without snapshot — it's automatic (color snap during drag)
+  const snapCardColor = useCallback((id, color) => {
+    setNodes((nds) =>
+      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, accentColor: color } } : n))
+    )
+  }, [])
+
   return {
     nodes, edges,
     onNodesChange, onEdgesChange, onConnect,
@@ -328,6 +382,7 @@ export function useCanvasStore() {
     addNode, updateNode, deleteNode,
     updateEdge,
     addStickyNote, updateStickyNote,
+    addTextCard, snapTextCardGrid, placeCardAtEdge, snapCardColor,
     snapNodeToGrid,
     copySelected, pasteClipboard,
     undo, redo,

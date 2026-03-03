@@ -20,6 +20,7 @@ export default function SystemNode({ data, selected, width }) {
   const category = CATEGORIES[data.category] ?? CATEGORIES.other
   const status   = STATUSES[data.status]    ?? STATUSES.unknown
   const Icon     = CATEGORY_ICONS[data.category] ?? Box
+  const ts       = data.touchingSides ?? { left: false, right: false, top: false, bottom: false }
 
   const scale = (width ?? BASE_WIDTH) / BASE_WIDTH
 
@@ -81,20 +82,29 @@ export default function SystemNode({ data, selected, width }) {
         }}
       >
         <div
-          className="rounded-xl overflow-hidden border flex flex-col"
+          className="overflow-hidden flex flex-col"
           style={{
             width: '100%',
             height: '100%',
+            borderStyle: 'solid',
+            borderTopWidth:    ts.top    ? 0 : 1,
+            borderRightWidth:  ts.right  ? 0 : 1,
+            borderBottomWidth: ts.bottom ? 0 : 1,
+            borderLeftWidth:   ts.left   ? 0 : 1,
             borderColor: selected
               ? `${category.color}90`
               : hovered
               ? `${category.color}60`
               : 'rgba(255,255,255,0.07)',
+            borderTopLeftRadius:     (ts.left  || ts.top)    ? 0 : 12,
+            borderTopRightRadius:    (ts.right || ts.top)    ? 0 : 12,
+            borderBottomRightRadius: (ts.right || ts.bottom) ? 0 : 12,
+            borderBottomLeftRadius:  (ts.left  || ts.bottom) ? 0 : 12,
             background: '#1e1e2e',
             boxShadow: hovered || selected
               ? `0 0 0 1px ${category.color}20, 0 10px 36px #00000065`
               : '0 4px 16px #00000040',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
+            transition: 'border-color 0.15s, box-shadow 0.15s, border-radius 0.1s',
           }}
         >
           <div className="shrink-0 h-1" style={{ background: category.color }} />
