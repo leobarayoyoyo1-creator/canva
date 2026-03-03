@@ -13,7 +13,7 @@ import SystemNode from './SystemNode'
 import StickyNote from './StickyNote'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
-import { useCanvasStore } from '../store/useCanvasStore'
+import { useCanvasStore, CATEGORIES, PRIMARY_COLOR } from '../store/useCanvasStore'
 
 const nodeTypes = {
   systemNode: SystemNode,
@@ -118,19 +118,17 @@ export default function Canvas() {
         <MiniMap
           nodeColor={(n) => {
             if (n.type === 'stickyNote') return '#fde047'
-            const map = { api: '#6366f1', database: '#10b981', queue: '#f59e0b', service: '#8b5cf6', other: '#6b7280' }
-            return map[n.data?.category] ?? '#6b7280'
+            return CATEGORIES[n.data?.category]?.color ?? CATEGORIES.other.color
           }}
           maskColor="rgba(0,0,0,0.6)"
           style={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)' }}
         />
 
-        {/* Botão flutuante */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(null) }}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white shadow-xl transition-all hover:brightness-110 active:scale-95"
-            style={{ background: '#6366f1' }}
+            style={{ background: PRIMARY_COLOR }}
           >
             <Plus size={14} />
             Adicionar Sistema
@@ -138,7 +136,6 @@ export default function Canvas() {
         </div>
       </ReactFlow>
 
-      {/* Context Menu */}
       {contextMenu.open && (
         <ContextMenu
           x={contextMenu.x}
@@ -158,7 +155,6 @@ export default function Canvas() {
         />
       )}
 
-      {/* Node Modal */}
       {modal.open && (
         <NodeModal
           mode={modal.mode}

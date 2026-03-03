@@ -22,7 +22,6 @@ export default function StickyNote({ id, data }) {
         maxWidth: 300,
       }}
     >
-      {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
         style={{ background: '#fde047' }}
@@ -42,7 +41,6 @@ export default function StickyNote({ id, data }) {
         </button>
       </div>
 
-      {/* Body */}
       {!collapsed && (
         <div className="p-2">
           <textarea
@@ -51,7 +49,6 @@ export default function StickyNote({ id, data }) {
             placeholder="Escreva uma nota..."
             className="w-full bg-transparent text-yellow-900 text-sm resize-none outline-none placeholder-yellow-900/40 nodrag"
             rows={4}
-            style={{ fontFamily: 'inherit' }}
           />
         </div>
       )}

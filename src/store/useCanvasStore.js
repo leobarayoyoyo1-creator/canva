@@ -15,10 +15,12 @@ export const STATUSES = {
   unknown:  { label: 'Desconhecido',  color: '#9ca3af' },
 }
 
+export const PRIMARY_COLOR = '#6366f1'
+
 const EDGE_STYLE = {
   type: 'smoothstep',
-  style: { stroke: '#6366f1', strokeWidth: 2 },
-  markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
+  style: { stroke: PRIMARY_COLOR, strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: PRIMARY_COLOR },
 }
 
 const INITIAL_NODES = [
@@ -38,7 +40,8 @@ function loadFromStorage() {
       nodes: nodes ? JSON.parse(nodes) : INITIAL_NODES,
       edges: edges ? JSON.parse(edges) : [],
     }
-  } catch {
+  } catch (e) {
+    console.warn('Erro ao carregar canvas do localStorage:', e)
     return { nodes: INITIAL_NODES, edges: [] }
   }
 }

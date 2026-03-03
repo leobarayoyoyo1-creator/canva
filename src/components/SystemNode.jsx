@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { Zap, Database, Layers, Server, Box, Plus } from 'lucide-react'
-import { CATEGORIES, STATUSES } from '../store/useCanvasStore'
+import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 
 const CATEGORY_ICONS = {
   api:      Zap,
@@ -24,7 +24,6 @@ export default function SystemNode({ data }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Target handle (esquerda) */}
       <Handle
         type="target"
         position={Position.Left}
@@ -38,7 +37,6 @@ export default function SystemNode({ data }) {
         }}
       />
 
-      {/* Card */}
       <div
         className="w-56 rounded-xl overflow-hidden shadow-xl border transition-all duration-150"
         style={{
@@ -47,12 +45,9 @@ export default function SystemNode({ data }) {
           boxShadow: hovered ? `0 0 0 1px ${category.color}40, 0 8px 24px #00000050` : '0 4px 16px #00000040',
         }}
       >
-        {/* Tarja de cor da categoria */}
         <div className="h-1" style={{ background: category.color }} />
 
-        {/* Body */}
         <div className="px-4 py-3.5 flex flex-col gap-3">
-          {/* Ícone + nome */}
           <div className="flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -65,7 +60,6 @@ export default function SystemNode({ data }) {
             </span>
           </div>
 
-          {/* Categoria + status */}
           <div className="flex items-center justify-between">
             <span
               className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -85,7 +79,6 @@ export default function SystemNode({ data }) {
         </div>
       </div>
 
-      {/* Source handle (direita) */}
       <Handle
         type="source"
         position={Position.Right}
@@ -100,7 +93,6 @@ export default function SystemNode({ data }) {
         }}
       />
 
-      {/* Botão + (hover, além do handle) */}
       <button
         onClick={(e) => {
           e.stopPropagation()
@@ -112,7 +104,7 @@ export default function SystemNode({ data }) {
           height: 22,
           right: -30,
           transform: 'translateY(-50%)',
-          background: '#6366f1',
+          background: PRIMARY_COLOR,
           opacity: hovered ? 1 : 0,
           pointerEvents: hovered ? 'auto' : 'none',
           scale: hovered ? '1' : '0.7',

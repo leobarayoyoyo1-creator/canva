@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATEGORIES, STATUSES } from '../store/useCanvasStore'
+import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 import { Trash2 } from 'lucide-react'
 
 export default function NodeModal({ mode = 'add', initialData, onSave, onDelete, onClose }) {
@@ -23,7 +23,6 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {/* Nome */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-white/40 uppercase tracking-wider">Nome</label>
             <input
@@ -35,7 +34,6 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
             />
           </div>
 
-          {/* Categoria */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-white/40 uppercase tracking-wider">Categoria</label>
             <div className="grid grid-cols-2 gap-2">
@@ -58,7 +56,6 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
             </div>
           </div>
 
-          {/* Status */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-white/40 uppercase tracking-wider">Status</label>
             <div className="flex gap-2">
@@ -81,7 +78,6 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
             </div>
           </div>
 
-          {/* Ações */}
           <div className="flex gap-2 mt-1">
             {mode === 'edit' && onDelete && (
               <button
@@ -104,7 +100,7 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
               type="submit"
               disabled={!name.trim()}
               className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-30 hover:brightness-110"
-              style={{ background: '#6366f1' }}
+              style={{ background: PRIMARY_COLOR }}
             >
               {mode === 'add' ? 'Criar' : 'Salvar'}
             </button>
