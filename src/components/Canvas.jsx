@@ -39,6 +39,7 @@ export default function Canvas() {
     addNode, updateNode, deleteNode,
     updateEdge,
     addStickyNote, updateStickyNote,
+    snapNodeToGrid,
   } = useCanvasStore()
 
   const { getNode, screenToFlowPosition } = useReactFlow()
@@ -61,6 +62,7 @@ export default function Canvas() {
                   : null
                 openAddModal(pos, n.id)
               },
+              onResizeEnd: (x, y, w, h) => snapNodeToGrid(n.id, x, y, w, h),
             },
           }
         }
@@ -72,7 +74,7 @@ export default function Canvas() {
         }
         return n
       }),
-    [nodes, getNode, openAddModal, updateStickyNote]
+    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid]
   )
 
   const edgesWithCallbacks = useMemo(

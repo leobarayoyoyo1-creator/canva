@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Handle, Position, NodeResizer, useReactFlow } from '@xyflow/react'
+import { Handle, Position, NodeResizer } from '@xyflow/react'
 import { Zap, Database, Layers, Server, Box, Plus } from 'lucide-react'
-import { CATEGORIES, STATUSES, PRIMARY_COLOR, SNAP_GRID } from '../store/useCanvasStore'
+import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 
 const CATEGORY_ICONS = {
   api:      Zap,
@@ -11,29 +11,17 @@ const CATEGORY_ICONS = {
   other:    Box,
 }
 
-const BASE_WIDTH   = 224
-const BASE_HEIGHT  = 96   // 96 = 3 × 32 → centers on 16px grid
-const RESIZE_SNAP  = SNAP_GRID * 2  // 32px steps so both width and height centers stay grid-aligned
+const BASE_WIDTH  = 224
+const BASE_HEIGHT = 96  // 96 = 3 × 32 → centers always on 16px grid
 
-export default function SystemNode({ id, data, selected, width }) {
+export default function SystemNode({ data, selected, width }) {
   const [hovered, setHovered] = useState(false)
-  const { updateNode } = useReactFlow()
 
   const category = CATEGORIES[data.category] ?? CATEGORIES.other
   const status   = STATUSES[data.status]    ?? STATUSES.unknown
   const Icon     = CATEGORY_ICONS[data.category] ?? Box
 
   const scale = (width ?? BASE_WIDTH) / BASE_WIDTH
-
-  // Snap position and dimensions to the resize grid on drag end,
-  // so the node is always correctly grid-aligned regardless of resize.
-  function onResizeEnd(_, { x, y, width: w, height: h }) {
-    const snap = (v) => Math.round(v / RESIZE_SNAP) * RESIZE_SNAP
-    updateNode(id, {
-      position: { x: snap(x), y: snap(y) },
-      style:    { width: snap(w), height: snap(h) },
-    })
-  }
 
   // Remove transform here — React Flow's CSS positions handles via translate(-50%,-50%)
   // and any inline transform would override that, causing misalignment after resize
@@ -59,7 +47,7 @@ export default function SystemNode({ id, data, selected, width }) {
         keepAspectRatio
         minWidth={192}
         minHeight={Math.round(192 * BASE_HEIGHT / BASE_WIDTH)}
-        onResizeEnd={onResizeEnd}
+        onResizeEnd={(_, { x, y, width: w, height: h }) => data.onResizeEnd?.(x, y, w, h)}
         lineStyle={{
           borderColor: `${PRIMARY_COLOR}60`,
           borderStyle: 'dashed',

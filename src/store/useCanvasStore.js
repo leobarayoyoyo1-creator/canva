@@ -163,6 +163,25 @@ export function useCanvasStore() {
     closeContextMenu()
   }, [closeModal, closeContextMenu])
 
+  // Snap a systemNode's position and dimensions to the grid after resize.
+  // Must go through setNodes directly — useReactFlow().updateNode bypasses
+  // the controlled state and gets overwritten on the next render.
+  const snapNodeToGrid = useCallback((id, x, y, w, h) => {
+    const snap16 = (v) => Math.round(v / SNAP_GRID) * SNAP_GRID
+    const snap32 = (v) => Math.round(v / (SNAP_GRID * 2)) * (SNAP_GRID * 2)
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id !== id
+          ? n
+          : {
+              ...n,
+              position: { x: snap16(x), y: snap16(y) },
+              style: { ...n.style, width: snap32(w), height: snap32(h) },
+            }
+      )
+    )
+  }, [])
+
   // Sticky note
   const addStickyNote = useCallback((position) => {
     const newId = String(idRef.current++)
@@ -193,5 +212,6 @@ export function useCanvasStore() {
     addNode, updateNode, deleteNode,
     updateEdge,
     addStickyNote, updateStickyNote,
+    snapNodeToGrid,
   }
 }
