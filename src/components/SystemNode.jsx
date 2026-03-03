@@ -25,11 +25,12 @@ export default function SystemNode({ data, selected, width }) {
 
   // Remove transform here — React Flow's CSS positions handles via translate(-50%,-50%)
   // and any inline transform would override that, causing misalignment after resize
+  const handleSize = Math.round(20 * scale)
   const handleStyle = {
-    width: 20,
-    height: 20,
+    width: handleSize,
+    height: handleSize,
     background: '#1e1e2e',
-    border: `2.5px solid ${category.color}`,
+    border: `${Math.max(1.5, 2.5 * scale)}px solid ${category.color}`,
     opacity: hovered ? 1 : 0,
     transition: 'opacity 0.18s, box-shadow 0.18s',
     boxShadow: hovered ? `0 0 0 4px ${category.color}20, 0 0 12px ${category.color}50` : 'none',

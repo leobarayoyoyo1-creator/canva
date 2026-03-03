@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
+import { useMemo, useState } from 'react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, useNodes } from '@xyflow/react'
 import { PRIMARY_COLOR } from '../store/useCanvasStore'
+import { computeSmartPath } from '../utils/smartPath'
 
 export default function SystemEdge({
   id,
+  source, target,
   sourceX, sourceY, sourcePosition,
   targetX, targetY, targetPosition,
   data,
@@ -11,9 +13,21 @@ export default function SystemEdge({
   markerEnd,
 }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft]     = useState('')
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const nodes = useNodes()
+
+  // Try smart routing first; fall back to standard bezier if no obstacle found
+  const smartResult = useMemo(
+    () => computeSmartPath(sourceX, sourceY, targetX, targetY, source, target, nodes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sourceX, sourceY, targetX, targetY, source, target,
+     // depend on node positions/sizes (stringify is cheap for ~20 nodes)
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+     nodes.map(n => `${n.id}:${n.position.x},${n.position.y},${n.measured?.width},${n.measured?.height}`).join('|')]
+  )
+
+  const [edgePath, labelX, labelY] = smartResult ?? getBezierPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
   })
@@ -37,7 +51,7 @@ export default function SystemEdge({
 
   return (
     <>
-      {/* Área de clique invisível mais larga (facilita selecionar a aresta) */}
+      {/* Invisible wide path for easier click-to-select */}
       <path
         d={edgePath}
         fill="none"

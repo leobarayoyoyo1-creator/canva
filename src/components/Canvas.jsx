@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -40,11 +40,28 @@ export default function Canvas() {
     updateEdge,
     addStickyNote, updateStickyNote,
     snapNodeToGrid,
+    copySelected, pasteClipboard,
+    undo, redo,
   } = useCanvasStore()
 
   const { getNode, screenToFlowPosition } = useReactFlow()
 
   const [guides, setGuides] = useState([])
+
+  // Global keyboard shortcuts (copy, paste, undo, redo)
+  useEffect(() => {
+    function onKey(e) {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return   // don't intercept text editing
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (e.key === 'c') { e.preventDefault(); copySelected() }
+      if (e.key === 'v') { e.preventDefault(); pasteClipboard() }
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [copySelected, pasteClipboard, undo, redo])
 
   // Injeta callbacks nos dados dos nodes sem serializar funções no estado
   const nodesWithCallbacks = useMemo(
@@ -184,8 +201,8 @@ export default function Canvas() {
         onNodeDragStop={onNodeDragStop}
         fitView
         fitViewOptions={{ padding: 0.4 }}
-        minZoom={0.15}
-        maxZoom={2.5}
+        minZoom={0.01}
+        maxZoom={20}
         panOnDrag={[1]}
         selectionOnDrag
         selectionMode={SelectionMode.Partial}
