@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { NodeResizer } from '@xyflow/react'
+import { Handle, NodeResizer, Position } from '@xyflow/react'
 import { PRIMARY_COLOR } from '../store/useCanvasStore'
 
 const DEFAULT_W = 240
@@ -25,7 +25,11 @@ const BG_COLORS = [
 export default function TextCard({ id, data, selected, width }) {
   const [editing, setEditing] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const textareaRef = useRef()
+  const textareaRef  = useRef()
+  const hoverTimer   = useRef()
+
+  const onEnter = () => { clearTimeout(hoverTimer.current); setHovered(true) }
+  const onLeave = () => { hoverTimer.current = setTimeout(() => setHovered(false), 120) }
 
   const text        = data.text        ?? ''
   const fontSize    = data.fontSize    ?? 14
@@ -57,12 +61,27 @@ export default function TextCard({ id, data, selected, width }) {
 
   const showToolbar = selected || hovered
 
+  const handleStyle = {
+    width: 12,
+    height: 12,
+    background: '#1e1e2e',
+    border: `2px solid ${accentColor}`,
+    opacity: hovered ? 1 : 0,
+    transition: 'opacity 0.18s',
+    cursor: 'crosshair',
+  }
+
   return (
     <div
       className="relative w-full h-full"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
     >
+      <Handle id="left"   type="source" position={Position.Left}   style={handleStyle} />
+      <Handle id="right"  type="source" position={Position.Right}  style={handleStyle} />
+      <Handle id="top"    type="source" position={Position.Top}    style={handleStyle} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={handleStyle} />
+
       <NodeResizer
         isVisible={selected}
         minWidth={120}

@@ -1,8 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { applyNodeChanges, applyEdgeChanges, addEdge, MarkerType } from '@xyflow/react'
 
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function fetchCanvas() {
+  const r = await fetch('/api/canvas')
+  if (!r.ok) throw new Error('Falha ao carregar canvas')
+  return r.json()
+}
+
+function persistCanvas(nodes, edges) {
+  fetch('/api/canvas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodes, edges }),
+  }).catch(console.error)
+}
+
 export const CATEGORIES = {
-  api:      { label: 'API',          color: '#6366f1' },
+  client:   { label: 'Cliente',       color: '#3b82f6' },
+  product:  { label: 'Produto',       color: '#f97316' },
+  api:      { label: 'API',           color: '#6366f1' },
   database: { label: 'Banco de Dados', color: '#10b981' },
   queue:    { label: 'Fila',          color: '#f59e0b' },
   service:  { label: 'Serviço',       color: '#8b5cf6' },
@@ -37,41 +54,30 @@ const INITIAL_NODES = [
   },
 ]
 
-function loadFromStorage() {
-  try {
-    const nodes = localStorage.getItem('canvas-nodes')
-    const edges = localStorage.getItem('canvas-edges')
-    const parsedEdges = edges ? JSON.parse(edges) : []
-    return {
-      nodes: nodes
-        ? JSON.parse(nodes).map((n) => ({
-            ...n,
-            style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, ...n.style },
-          }))
-        : INITIAL_NODES,
-      // migra edges antigas para o tipo customizado e garante sourceHandle/targetHandle
-      edges: parsedEdges.map((e) => ({
-        ...e,
-        type: 'system',
-        data: { label: e.data?.label ?? '' },
-        sourceHandle: e.sourceHandle ?? 'right',
-        targetHandle: e.targetHandle ?? 'left',
-      })),
-    }
-  } catch (e) {
-    console.warn('Erro ao carregar canvas do localStorage:', e)
-    return { nodes: INITIAL_NODES, edges: [] }
-  }
+function migrateNodes(nodes) {
+  return nodes.map((n) => {
+    const base = { ...n, style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, ...n.style } }
+    if (n.type === 'textCard') { const { connectable: _, ...rest } = base; return rest }
+    return base
+  })
+}
+
+function migrateEdges(edges) {
+  return edges.map((e) => ({
+    ...e,
+    type: 'system',
+    data: { label: e.data?.label ?? '' },
+    sourceHandle: e.sourceHandle ?? 'right',
+    targetHandle: e.targetHandle ?? 'left',
+  }))
 }
 
 export function useCanvasStore() {
-  const saved = loadFromStorage()
-  const idRef = useRef(
-    Math.max(0, ...saved.nodes.map((n) => parseInt(n.id) || 0)) + 1
-  )
+  const idRef = useRef(2)
 
-  const [nodes, setNodes] = useState(saved.nodes)
-  const [edges, setEdges] = useState(saved.edges)
+  const [nodes, setNodes] = useState([])
+  const [edges, setEdges] = useState([])
+  const [initialized, setInitialized] = useState(false)
 
   // modal: { open, mode: 'add'|'edit', nodeId, position, sourceNodeId }
   const [modal, setModal] = useState({ open: false, mode: 'add', nodeId: null, position: null, sourceNodeId: null })
@@ -87,19 +93,45 @@ export function useCanvasStore() {
   // Uses a ref so history updates never trigger re-renders.
   const historyRef = useRef({ past: [], future: [] })
   // Always-current ref so snapshot() captures state without stale closures.
-  const latestRef  = useRef({ nodes: saved.nodes, edges: saved.edges })
+  const latestRef  = useRef({ nodes: [], edges: [] })
 
   // Keep latestRef in sync so snapshot() always sees the most recent state
   useEffect(() => { latestRef.current = { nodes, edges } }, [nodes, edges])
 
-  // Persist to localStorage
+  // Load canvas from server on mount
   useEffect(() => {
-    localStorage.setItem('canvas-nodes', JSON.stringify(nodes))
-  }, [nodes])
+    fetchCanvas()
+      .then(({ nodes: n, edges: e }) => {
+        const loadedNodes = n.length ? migrateNodes(n) : INITIAL_NODES
+        const loadedEdges = migrateEdges(e)
+        idRef.current = Math.max(1, ...loadedNodes.map((nd) => parseInt(nd.id) || 0)) + 1
+        setNodes(loadedNodes)
+        setEdges(loadedEdges)
+      })
+      .catch(() => {
+        setNodes(INITIAL_NODES)
+      })
+      .finally(() => setInitialized(true))
+  }, [])
 
+  // Persist to server (debounced 1 s) whenever canvas changes
+  const saveTimer = useRef(null)
   useEffect(() => {
-    localStorage.setItem('canvas-edges', JSON.stringify(edges))
-  }, [edges])
+    if (!initialized) return
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => persistCanvas(nodes, edges), 1000)
+  }, [nodes, edges, initialized])
+
+  // Save immediately before the page unloads (F5, Ctrl+F5, fechar aba)
+  useEffect(() => {
+    function handleUnload() {
+      const { nodes: n, edges: e } = latestRef.current
+      const blob = new Blob([JSON.stringify({ nodes: n, edges: e })], { type: 'application/json' })
+      navigator.sendBeacon('/api/canvas', blob)
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [])
 
   // Save current state into the undo stack; clears the redo stack.
   // Call this BEFORE any state-mutating action so undo restores the
@@ -342,7 +374,6 @@ export function useCanvasStore() {
         type: 'textCard',
         position: { x: snap16(pos.x), y: snap16(pos.y) },
         style: { width: 240, height: 160 },
-        connectable: false,
         data: {
           text: '',
           fontSize: 14,
@@ -383,8 +414,20 @@ export function useCanvasStore() {
     )
   }, [])
 
+  // Recebe o canvas completo do servidor (via SSE canvas-update) e substitui o estado.
+  // O servidor é a fonte de verdade para operações de webhook.
+  const setCanvasFromServer = useCallback(({ nodes: n, edges: e }) => {
+    snapshot()
+    const loadedNodes = migrateNodes(n)
+    const loadedEdges = migrateEdges(e)
+    idRef.current = Math.max(1, ...loadedNodes.map((nd) => parseInt(nd.id) || 0)) + 1
+    setNodes(loadedNodes)
+    setEdges(loadedEdges)
+  }, [snapshot])
+
   return {
     nodes, edges,
+    initialized,
     onNodesChange, onEdgesChange, onConnect,
     modal, openAddModal, openEditModal, closeModal,
     contextMenu, openContextMenu, closeContextMenu,
@@ -395,5 +438,6 @@ export function useCanvasStore() {
     snapNodeToGrid,
     copySelected, pasteClipboard,
     undo, redo,
+    setCanvasFromServer,
   }
 }

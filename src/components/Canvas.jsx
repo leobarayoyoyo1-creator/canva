@@ -19,6 +19,7 @@ import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
 import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID } from '../store/useCanvasStore'
+import { useWebhookListener } from '../hooks/useWebhookListener'
 
 const nodeTypes = {
   systemNode: SystemNode,
@@ -93,6 +94,7 @@ function getTouchingSides(node, allNodes) {
 export default function Canvas() {
   const {
     nodes, edges,
+    initialized,
     onNodesChange, onEdgesChange, onConnect,
     modal, openAddModal, openEditModal, closeModal,
     contextMenu, openContextMenu, closeContextMenu,
@@ -103,7 +105,10 @@ export default function Canvas() {
     snapNodeToGrid,
     copySelected, pasteClipboard,
     undo, redo,
+    setCanvasFromServer,
   } = useCanvasStore()
+
+  useWebhookListener(setCanvasFromServer)
 
   const { getNode, screenToFlowPosition } = useReactFlow()
 
@@ -349,6 +354,14 @@ export default function Canvas() {
   )
 
   const modalNode = modal.nodeId ? nodes.find((n) => n.id === modal.nodeId) : null
+
+  if (!initialized) {
+    return (
+      <div className="w-full h-full bg-[#13131f] flex items-center justify-center">
+        <span className="text-white/40 text-sm">Carregando canvas…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="relative w-full h-full bg-[#13131f]" onClick={closeContextMenu}>

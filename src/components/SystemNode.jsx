@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react'
 import { Handle, Position, NodeResizer } from '@xyflow/react'
-import { Zap, Database, Layers, Server, Box, Plus } from 'lucide-react'
+import { Zap, Database, Layers, Server, Box, Plus, User, Wrench } from 'lucide-react'
 import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 
 const CATEGORY_ICONS = {
+  client:   User,
+  product:  Wrench,
   api:      Zap,
   database: Database,
   queue:    Layers,
