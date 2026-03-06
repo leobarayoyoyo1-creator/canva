@@ -30,7 +30,8 @@ const DIMS = {
 }
 
 function nodeW(n) {
-  if (n.measured?.width) return n.measured.width
+  if (n.measured?.width)  return n.measured.width
+  if (n.style?.width)     return n.style.width      // tamanho real armazenado (ex: produto com texto)
   if (n.type === 'textCard')   return DIMS.textCard.w
   if (n.type === 'stickyNote') return DIMS.stickyNote.w
   return (DIMS[n.data?.category] ?? DIMS._default).w
@@ -38,6 +39,7 @@ function nodeW(n) {
 
 function nodeH(n) {
   if (n.measured?.height) return n.measured.height
+  if (n.style?.height)    return n.style.height     // tamanho real armazenado (ex: produto com texto)
   if (n.type === 'textCard')   return DIMS.textCard.h
   if (n.type === 'stickyNote') return DIMS.stickyNote.h
   return (DIMS[n.data?.category] ?? DIMS._default).h

@@ -59,8 +59,8 @@ function getTouchingSides(node, allNodes) {
   const [dw, dh] = getDefaultDims(node)
   const nL = node.position.x
   const nT = node.position.y
-  const nR = nL + (node.measured?.width  ?? dw)
-  const nB = nT + (node.measured?.height ?? dh)
+  const nR = nL + (node.measured?.width  ?? node.style?.width  ?? dw)
+  const nB = nT + (node.measured?.height ?? node.style?.height ?? dh)
 
   for (const other of allNodes) {
     if (other.id === node.id) continue
@@ -68,8 +68,8 @@ function getTouchingSides(node, allNodes) {
     const [ow, oh] = getDefaultDims(other)
     const oL = other.position.x
     const oT = other.position.y
-    const oR = oL + (other.measured?.width  ?? ow)
-    const oB = oT + (other.measured?.height ?? oh)
+    const oR = oL + (other.measured?.width  ?? other.style?.width  ?? ow)
+    const oB = oT + (other.measured?.height ?? other.style?.height ?? oh)
 
     const yOverlap = nB > oT + TOUCH_THRESHOLD && nT < oB - TOUCH_THRESHOLD
     const xOverlap = nR > oL + TOUCH_THRESHOLD && nL < oR - TOUCH_THRESHOLD

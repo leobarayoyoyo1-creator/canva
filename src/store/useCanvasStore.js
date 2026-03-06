@@ -235,16 +235,18 @@ export function useCanvasStore() {
   }, [])
 
   // Node CRUD
-  const addNode = useCallback(({ name, category, status }, position, sourceNodeId = null) => {
+  const addNode = useCallback(({ name, category, status, text }, position, sourceNodeId = null) => {
     snapshot()
     const newId = String(idRef.current++)
     const { width, height } = getDims(category)
+    // Nodes com texto precisam de altura extra para exibir a seção de descrição
+    const textHeight = text ? Math.max(height, 160) : height
     const newNode = {
       id: newId,
       type: 'systemNode',
       position: position ?? { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 },
-      style: { width, height },
-      data: { name, category, status },
+      style: { width, height: textHeight },
+      data: { name, category, status, ...(text ? { text } : {}) },
     }
     setNodes((nds) => [...nds, newNode])
     if (sourceNodeId) {

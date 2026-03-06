@@ -117,14 +117,15 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
     productY = snap16(clientY + (clientDims.height - productDims.height) / 2)  // centralizado verticalmente no cliente
   }
 
-  // 3. Criar node de produto
-  const productId = String(idCounter++)
+  // 3. Criar node de produto (o modelo fica embutido em data.text — sem textCard separado)
+  const productId     = String(idCounter++)
+  const productHeight = modelo ? 160 : productDims.height
   newNodes.push({
     id: productId,
     type: 'systemNode',
     position: { x: productX, y: productY },
-    style: { width: productDims.width, height: productDims.height },
-    data: { name: codigo, category: 'product', status: 'unknown', createdAt },
+    style: { width: productDims.width, height: productHeight },
+    data: { name: codigo, category: 'product', status: 'unknown', createdAt, text: modelo },
   })
   newEdges.push({
     id: `e${clientId}-${productId}`,
@@ -132,31 +133,6 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
     sourceHandle: 'right',
     target: productId,
     targetHandle: 'left',
-    ...EDGE_STYLE,
-  })
-
-  // 4. Criar TextCard de modelo abaixo do produto
-  const modelId = String(idCounter++)
-  newNodes.push({
-    id: modelId,
-    type: 'textCard',
-    position: { x: productX, y: snap16(productY + productDims.height + 32) },
-    style: { width: DEFAULT_NODE_WIDTH, height: 64 },
-    data: {
-      text: modelo,
-      fontSize: 13,
-      textColor: '#e2e8f0',
-      bgColor: '#1e1e2e',
-      accentColor: CATEGORIES.product.color,
-      createdAt,
-    },
-  })
-  newEdges.push({
-    id: `e${productId}-${modelId}`,
-    source: productId,
-    sourceHandle: 'bottom',
-    target: modelId,
-    targetHandle: 'top',
     ...EDGE_STYLE,
   })
 

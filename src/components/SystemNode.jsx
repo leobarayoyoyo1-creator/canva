@@ -151,6 +151,26 @@ export default function SystemNode({ data, selected, width }) {
         </div>
       </div>
 
+      {/* Text section: shown below the scaled content when data.text is present.
+          Positioned absolutely so it naturally fills whatever space remains.
+          pointerEvents:none so clicks/drag still reach the outer div. */}
+      {data.text && (
+        <div
+          className="absolute left-0 right-0 overflow-hidden pointer-events-none"
+          style={{ top: Math.round(BASE_HEIGHT * scale), bottom: 0 }}
+        >
+          <div className="h-px mx-3" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          <div className="px-3 pt-2 pb-1">
+            <span
+              className="block text-sm font-semibold leading-snug line-clamp-3"
+              style={{ color: 'rgba(255,255,255,0.55)' }}
+            >
+              {data.text}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* + button: outside the scaled content, sized and positioned proportionally */}
       <button
         onClick={(e) => {

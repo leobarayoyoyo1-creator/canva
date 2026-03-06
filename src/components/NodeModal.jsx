@@ -3,14 +3,15 @@ import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 import { Trash2 } from 'lucide-react'
 
 export default function NodeModal({ mode = 'add', initialData, onSave, onDelete, onClose }) {
-  const [name, setName] = useState(initialData?.name ?? '')
+  const [name,     setName]     = useState(initialData?.name     ?? '')
   const [category, setCategory] = useState(initialData?.category ?? 'api')
-  const [status, setStatus] = useState(initialData?.status ?? 'active')
+  const [status,   setStatus]   = useState(initialData?.status   ?? 'active')
+  const [text,     setText]     = useState(initialData?.text     ?? '')
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) return
-    onSave({ name: name.trim(), category, status })
+    onSave({ name: name.trim(), category, status, text: text.trim() })
   }
 
   return (
@@ -76,6 +77,19 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-white/40 uppercase tracking-wider">
+              Descrição <span className="normal-case text-white/20">(opcional)</span>
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Ex: TF-72, contrato vigente..."
+              rows={2}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-500 transition-colors resize-none"
+            />
           </div>
 
           <div className="flex gap-2 mt-1">
