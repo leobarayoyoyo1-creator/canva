@@ -35,6 +35,17 @@ export const STATUSES = {
 export const PRIMARY_COLOR = '#6366f1'
 export const SNAP_GRID     = 16
 
+// Dimensões por categoria — múltiplos de 16px para alinhar ao snap grid.
+// client maior para ser visualmente dominante; product menor para ser subordinado.
+export const NODE_DIMS = {
+  client:  { width: 256, height: 112 },
+  product: { width: 192, height: 80  },
+}
+
+function getDims(category) {
+  return NODE_DIMS[category] ?? { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT }
+}
+
 const EDGE_STYLE = {
   type: 'system',
   data: { label: '' },
@@ -57,6 +68,14 @@ const INITIAL_NODES = [
 function migrateNodes(nodes) {
   return nodes.map((n) => {
     const base = { ...n, style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, ...n.style } }
+
+    // Atualiza nodes systemNode ainda com o tamanho padrão genérico para o tamanho correto
+    // da categoria. Nodes que o usuário redimensionou manualmente (≠ 224×96) são preservados.
+    if (n.type === 'systemNode' && base.style.width === DEFAULT_NODE_WIDTH && base.style.height === DEFAULT_NODE_HEIGHT) {
+      const dims = getDims(n.data?.category)
+      base.style = { ...base.style, width: dims.width, height: dims.height }
+    }
+
     if (n.type === 'textCard') { const { connectable: _, ...rest } = base; return rest }
     return base
   })
@@ -219,11 +238,12 @@ export function useCanvasStore() {
   const addNode = useCallback(({ name, category, status }, position, sourceNodeId = null) => {
     snapshot()
     const newId = String(idRef.current++)
+    const { width, height } = getDims(category)
     const newNode = {
       id: newId,
       type: 'systemNode',
       position: position ?? { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 },
-      style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
+      style: { width, height },
       data: { name, category, status },
     }
     setNodes((nds) => [...nds, newNode])
@@ -425,6 +445,17 @@ export function useCanvasStore() {
     setEdges(loadedEdges)
   }, [snapshot])
 
+  // Aplica um mapa de posições calculado por computeAutoLayout ao estado real dos nodes.
+  const applyLayout = useCallback((positionMap) => {
+    snapshot()
+    setNodes(nds =>
+      nds.map(n => {
+        const pos = positionMap.get(n.id)
+        return pos ? { ...n, position: pos } : n
+      })
+    )
+  }, [snapshot])
+
   return {
     nodes, edges,
     initialized,
@@ -439,5 +470,6 @@ export function useCanvasStore() {
     copySelected, pasteClipboard,
     undo, redo,
     setCanvasFromServer,
+    applyLayout,
   }
 }

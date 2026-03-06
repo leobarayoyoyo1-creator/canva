@@ -32,6 +32,8 @@ export default function ContextMenu({ x, y, type, onAddSystem, onAddNote, onAddC
           <MenuItem icon={LayoutGrid} label="Adicionar Cartão"  onClick={onAddCard} />
           <MenuItem icon={StickyNote} label="Adicionar Nota"    onClick={onAddNote} />
         </>
+      ) : type === 'stickyNote' ? (
+        <MenuItem icon={Trash2} label="Deletar Nota"   onClick={onDelete} danger />
       ) : type === 'textCard' ? (
         <MenuItem icon={Trash2} label="Deletar Cartão" onClick={onDelete} danger />
       ) : (

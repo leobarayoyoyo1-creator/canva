@@ -11,7 +11,7 @@ import {
   ConnectionLineType,
   ConnectionMode,
 } from '@xyflow/react'
-import { Plus } from 'lucide-react'
+import { Plus, LayoutGrid } from 'lucide-react'
 import SystemNode from './SystemNode'
 import SystemEdge from './SystemEdge'
 import StickyNote from './StickyNote'
@@ -19,8 +19,9 @@ import TextCard from './TextCard'
 import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
-import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID } from '../store/useCanvasStore'
+import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID, NODE_DIMS } from '../store/useCanvasStore'
 import { useWebhookListener } from '../hooks/useWebhookListener'
+import { computeAutoLayout } from '../utils/autoLayout'
 
 const nodeTypes = {
   systemNode: SystemNode,
@@ -38,9 +39,14 @@ const GUIDE_THRESHOLD = 6
 // Returns which sides of `node` are touching another systemNode or textCard.
 // Used to merge borders visually when nodes are adjacent.
 const TOUCH_THRESHOLD = 2   // px tolerance for floating-point positions
-const DEFAULT_DIMS = {
-  systemNode: [224, 96],
-  textCard:   [240, 160],
+
+function getDefaultDims(node) {
+  if (node.type === 'textCard') return [240, 160]
+  if (node.type === 'systemNode') {
+    const d = NODE_DIMS[node.data?.category]
+    return d ? [d.width, d.height] : [224, 96]
+  }
+  return [224, 96]
 }
 
 function getTouchingSides(node, allNodes) {
@@ -50,7 +56,7 @@ function getTouchingSides(node, allNodes) {
     left: false, right: false, top: false, bottom: false,
     topLeft: false, topRight: false, bottomLeft: false, bottomRight: false,
   }
-  const [dw, dh] = DEFAULT_DIMS[node.type] ?? [224, 96]
+  const [dw, dh] = getDefaultDims(node)
   const nL = node.position.x
   const nT = node.position.y
   const nR = nL + (node.measured?.width  ?? dw)
@@ -59,7 +65,7 @@ function getTouchingSides(node, allNodes) {
   for (const other of allNodes) {
     if (other.id === node.id) continue
     if (other.type !== 'systemNode' && other.type !== 'textCard') continue
-    const [ow, oh] = DEFAULT_DIMS[other.type] ?? [224, 96]
+    const [ow, oh] = getDefaultDims(other)
     const oL = other.position.x
     const oT = other.position.y
     const oR = oL + (other.measured?.width  ?? ow)
@@ -107,6 +113,7 @@ export default function Canvas() {
     copySelected, pasteClipboard,
     undo, redo,
     setCanvasFromServer,
+    applyLayout,
   } = useCanvasStore()
 
   useWebhookListener(setCanvasFromServer)
@@ -250,7 +257,7 @@ export default function Canvas() {
               onAddNear: () => {
                 const node = getNode(n.id)
                 const p = node
-                  ? { x: node.position.x + (node.measured?.width ?? 224) + 48, y: node.position.y }
+                  ? { x: node.position.x + (node.measured?.width ?? getDefaultDims(n)[0]) + 48, y: node.position.y }
                   : null
                 openAddModal(p, n.id)
               },
@@ -324,8 +331,9 @@ export default function Canvas() {
         (n) => n.id !== draggingNode.id && n.type === 'systemNode'
       )
 
-      const dw = draggingNode.measured?.width  ?? 224
-      const dh = draggingNode.measured?.height ?? 80
+      const [ddW, ddH] = getDefaultDims(draggingNode)
+      const dw = draggingNode.measured?.width  ?? ddW
+      const dh = draggingNode.measured?.height ?? ddH
       const dx = draggingNode.position.x
       const dy = draggingNode.position.y
 
@@ -337,8 +345,9 @@ export default function Canvas() {
       }
 
       for (const other of others) {
-        const ow = other.measured?.width  ?? 224
-        const oh = other.measured?.height ?? 80
+        const [odW, odH] = getDefaultDims(other)
+        const ow = other.measured?.width  ?? odW
+        const oh = other.measured?.height ?? odH
         const ox = other.position.x
         const oy = other.position.y
 
@@ -379,8 +388,9 @@ export default function Canvas() {
       const touches = (n) => {
         const nL = n.position.x
         const nT = n.position.y
-        const nR = nL + (n.measured?.width  ?? (n.type === 'textCard' ? 240 : 224))
-        const nB = nT + (n.measured?.height ?? (n.type === 'textCard' ? 160 :  96))
+        const [nDW, nDH] = getDefaultDims(n)
+        const nR = nL + (n.measured?.width  ?? nDW)
+        const nB = nT + (n.measured?.height ?? nDH)
         return dL <= nR && dR >= nL && dT <= nB && dB >= nT
       }
 
@@ -441,8 +451,9 @@ export default function Canvas() {
 
       const nL = n.position.x
       const nT = n.position.y
-      const nW = n.measured?.width  ?? (n.type === 'textCard' ? 240 : 224)
-      const nH = n.measured?.height ?? (n.type === 'textCard' ? 160 :  96)
+      const [nDW, nDH] = getDefaultDims(n)
+      const nW = n.measured?.width  ?? nDW
+      const nH = n.measured?.height ?? nDH
       const nR = nL + nW
       const nB = nT + nH
 
@@ -480,12 +491,19 @@ export default function Canvas() {
   const onNodeContextMenu = useCallback(
     (e, node) => {
       e.preventDefault()
-      if (node.type === 'stickyNote') return
-      const menuType = node.type === 'textCard' ? 'textCard' : 'node'
+      const menuType = node.type === 'stickyNote' ? 'stickyNote'
+        : node.type === 'textCard' ? 'textCard'
+        : 'node'
       openContextMenu(e.clientX, e.clientY, menuType, null, node.id)
     },
     [openContextMenu]
   )
+
+  const handleAutoLayout = useCallback(() => {
+    const layoutMap = computeAutoLayout(nodes, edges)
+    applyLayout(layoutMap)
+    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 80)
+  }, [nodes, edges, applyLayout, fitView])
 
   const modalNode = modal.nodeId ? nodes.find((n) => n.id === modal.nodeId) : null
 
@@ -552,7 +570,7 @@ export default function Canvas() {
           style={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)' }}
         />
 
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); openAddModal(null) }}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white shadow-xl transition-all hover:brightness-110 active:scale-95"
@@ -560,6 +578,15 @@ export default function Canvas() {
           >
             <Plus size={14} />
             Adicionar Sistema
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleAutoLayout() }}
+            className="flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium text-white/70 shadow-xl transition-all hover:text-white hover:brightness-110 active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+            title="Organizar automaticamente"
+          >
+            <LayoutGrid size={14} />
+            Organizar
           </button>
         </div>
       </ReactFlow>

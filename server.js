@@ -36,6 +36,15 @@ const SNAP_GRID           = 16
 const DEFAULT_NODE_WIDTH  = 224
 const DEFAULT_NODE_HEIGHT = 96
 
+// Dimensões por categoria (espelhado de useCanvasStore.js → NODE_DIMS)
+const NODE_DIMS = {
+  client:  { width: 256, height: 112 },
+  product: { width: 192, height: 80  },
+}
+function getNodeDims(category) {
+  return NODE_DIMS[category] ?? { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT }
+}
+
 function snap16(v) { return Math.round(v / SNAP_GRID) * SNAP_GRID }
 
 // Retorna o próximo ID disponível com base nos nodes existentes
@@ -64,12 +73,14 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
 
   let clientId, clientX, clientY
 
+  const clientDims = getNodeDims('client')
+
   if (existingClient) {
     clientId = existingClient.id
     clientX  = existingClient.position.x
     clientY  = existingClient.position.y
   } else {
-    const allY = nodes.map(n => n.position.y + (n.measured?.height ?? DEFAULT_NODE_HEIGHT) + 80)
+    const allY = nodes.map(n => n.position.y + (n.measured?.height ?? getNodeDims(n.data?.category).height) + 80)
     clientY  = snap16(allY.length > 0 ? Math.max(...allY) : 160)
     clientX  = 100
     clientId = String(idCounter++)
@@ -77,22 +88,34 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
       id: clientId,
       type: 'systemNode',
       position: { x: clientX, y: clientY },
-      style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
+      style: { width: clientDims.width, height: clientDims.height },
       data: { name: nome, category: 'client', status: 'active' },
     })
   }
 
-  // 2. Contar produtos já conectados a este cliente
-  const existingProductCount = edges
-    .filter(e => e.source === clientId || e.target === clientId)
-    .map(e => e.source === clientId ? e.target : e.source)
-    .filter(pid => {
-      const n = nodes.find(n => n.id === pid)
-      return n?.type === 'systemNode' && n?.data.category === 'product'
-    }).length
+  // 2. Produtos já conectados a este cliente (source=cliente, target=produto)
+  const existingProducts = edges
+    .filter(e => e.source === clientId)
+    .map(e => nodes.find(n => n.id === e.target))
+    .filter(n => n?.type === 'systemNode' && n?.data?.category === 'product')
 
-  const productY = snap16(clientY + existingProductCount * 240)
-  const productX = snap16(clientX + 320)
+  // Deduplicação: mesmo código já existe para este cliente → ignora
+  if (existingProducts.some(n => n.data.name.trim().toLowerCase() === codigo.trim().toLowerCase())) {
+    return { newNodes: [], newEdges: [] }
+  }
+
+  const productDims = getNodeDims('product')
+
+  // Posiciona à direita do produto mais à direita; se não há produtos, à direita do cliente
+  let productX, productY
+  if (existingProducts.length > 0) {
+    const rightmost = existingProducts.reduce((a, b) => a.position.x > b.position.x ? a : b)
+    productX = snap16(rightmost.position.x + (rightmost.measured?.width ?? productDims.width) + 32)
+    productY = rightmost.position.y
+  } else {
+    productX = snap16(clientX + clientDims.width + 48)
+    productY = snap16(clientY + (clientDims.height - productDims.height) / 2)  // centralizado verticalmente no cliente
+  }
 
   // 3. Criar node de produto
   const productId = String(idCounter++)
@@ -100,7 +123,7 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
     id: productId,
     type: 'systemNode',
     position: { x: productX, y: productY },
-    style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
+    style: { width: productDims.width, height: productDims.height },
     data: { name: codigo, category: 'product', status: 'unknown', createdAt },
   })
   newEdges.push({
@@ -117,7 +140,7 @@ function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
   newNodes.push({
     id: modelId,
     type: 'textCard',
-    position: { x: productX, y: snap16(productY + DEFAULT_NODE_HEIGHT + 32) },
+    position: { x: productX, y: snap16(productY + productDims.height + 32) },
     style: { width: DEFAULT_NODE_WIDTH, height: 64 },
     data: {
       text: modelo,
@@ -204,6 +227,11 @@ app.post('/api/webhook/entrada', (req, res) => {
   const edges = JSON.parse(row.edges)
 
   const { newNodes, newEdges } = processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges)
+
+  // Duplicata detectada em processEntrada — nada a fazer
+  if (!newNodes.length) {
+    return res.json({ ok: true, duplicata: true, clientes_conectados: sseClients.length })
+  }
 
   const updatedNodes = [...nodes, ...newNodes]
   const updatedEdges = [...edges, ...newEdges]

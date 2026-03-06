@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useNodes } from '@xyflow/react'
 import { PRIMARY_COLOR } from '../store/useCanvasStore'
 import { computeSmartPath } from '../utils/smartPath'
@@ -14,6 +14,7 @@ export default function SystemEdge({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState('')
+  const cancelRef = useRef(false)
 
   const nodes = useNodes()
 
@@ -41,12 +42,15 @@ export default function SystemEdge({
   }
 
   function commit() {
+    const wasCancelled = cancelRef.current
+    cancelRef.current  = false
     setEditing(false)
-    data?.onUpdate?.(id, { label: draft.trim() })
+    if (!wasCancelled) data?.onUpdate?.(id, { label: draft.trim() })
   }
 
   function onKeyDown(e) {
-    if (e.key === 'Enter' || e.key === 'Escape') e.target.blur()
+    if (e.key === 'Enter')  e.target.blur()
+    if (e.key === 'Escape') { cancelRef.current = true; e.target.blur() }
   }
 
   return (
