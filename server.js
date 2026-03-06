@@ -50,7 +50,7 @@ const EDGE_STYLE = {
 }
 
 // Lógica de criação de nodes a partir de uma entrada de webhook
-function processEntrada({ nome, codigo, modelo }, nodes, edges) {
+function processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges) {
   const newNodes = []
   const newEdges = []
   let idCounter = nextId([...nodes, ...newNodes])
@@ -101,7 +101,7 @@ function processEntrada({ nome, codigo, modelo }, nodes, edges) {
     type: 'systemNode',
     position: { x: productX, y: productY },
     style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT },
-    data: { name: codigo, category: 'product', status: 'unknown' },
+    data: { name: codigo, category: 'product', status: 'unknown', createdAt },
   })
   newEdges.push({
     id: `e${clientId}-${productId}`,
@@ -125,6 +125,7 @@ function processEntrada({ nome, codigo, modelo }, nodes, edges) {
       textColor: '#e2e8f0',
       bgColor: '#1e1e2e',
       accentColor: CATEGORIES.product.color,
+      createdAt,
     },
   })
   newEdges.push({
@@ -189,17 +190,20 @@ app.get('/api/events', (req, res) => {
 // POST /api/webhook/entrada — n8n envia { nome, codigo, modelo } aqui
 // O servidor processa, salva no banco e faz broadcast do canvas atualizado
 app.post('/api/webhook/entrada', (req, res) => {
-  const { nome, codigo, modelo } = req.body ?? {}
+  const { nome, codigo, modelo, data } = req.body ?? {}
 
   if (!nome || !codigo || !modelo) {
     return res.status(400).json({ error: 'Campos obrigatórios: nome, codigo, modelo' })
   }
 
+  // `data` é opcional — se não vier, usa a data atual do servidor (YYYY-MM-DD)
+  const createdAt = data ?? new Date().toISOString().split('T')[0]
+
   const row = getCanvas.get()
   const nodes = JSON.parse(row.nodes)
   const edges = JSON.parse(row.edges)
 
-  const { newNodes, newEdges } = processEntrada({ nome, codigo, modelo }, nodes, edges)
+  const { newNodes, newEdges } = processEntrada({ nome, codigo, modelo, createdAt }, nodes, edges)
 
   const updatedNodes = [...nodes, ...newNodes]
   const updatedEdges = [...edges, ...newEdges]

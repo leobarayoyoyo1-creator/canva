@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import FilterBar from './FilterBar'
 import {
   ReactFlow,
   Background,
@@ -110,12 +111,101 @@ export default function Canvas() {
 
   useWebhookListener(setCanvasFromServer)
 
-  const { getNode, screenToFlowPosition } = useReactFlow()
+  const { getNode, screenToFlowPosition, fitView } = useReactFlow()
 
   const [guides, setGuides] = useState([])
 
   // Tracks last snapped color per textCard during drag — avoids redundant setNodes calls
   const snapColorRef = useRef({})
+
+  // ── Filter state ────────────────────────────────────────────────────────────
+  const [filterDates, setFilterDates] = useState(() => {
+    try {
+      const s = localStorage.getItem('canvas-filter')
+      return s ? JSON.parse(s) : { active: false, from: '', to: '' }
+    } catch { return { active: false, from: '', to: '' } }
+  })
+  // filterPositions: posições temporárias dos nodes durante o filtro (não vão pro banco)
+  const [filterPositions, setFilterPositions] = useState({})
+
+  useEffect(() => {
+    localStorage.setItem('canvas-filter', JSON.stringify(filterDates))
+  }, [filterDates])
+
+  const applyFilter = useCallback((from, to) => {
+    setFilterPositions({})
+    setFilterDates({ active: true, from, to })
+  }, [])
+
+  const clearFilter = useCallback(() => {
+    setFilterPositions({})
+    setFilterDates({ active: false, from: '', to: '' })
+  }, [])
+
+  // Computed: quais nodes/edges são visíveis e suas posições de layout
+  // Layout: clientX=100, productX=420, groups de 240px, gap entre clientes=80px
+  const filterData = useMemo(() => {
+    if (!filterDates.active || !filterDates.from || !filterDates.to) return null
+
+    const { from, to } = filterDates
+
+    const matchingProducts = nodes.filter(n =>
+      n.type === 'systemNode' &&
+      n.data?.category === 'product' &&
+      n.data?.createdAt >= from &&
+      n.data?.createdAt <= to
+    )
+
+    const visibleIds   = new Set()
+    const clientGroups = new Map()   // clientKey → { clientNode | null, productIds[] }
+
+    for (const product of matchingProducts) {
+      visibleIds.add(product.id)
+
+      const clientEdge = edges.find(e => e.target === product.id && e.targetHandle === 'left')
+      const clientNode = clientEdge ? nodes.find(n => n.id === clientEdge.source) : null
+      const clientKey  = clientNode?.id ?? `__orphan_${product.id}`
+
+      if (clientNode) visibleIds.add(clientNode.id)
+      if (!clientGroups.has(clientKey)) {
+        clientGroups.set(clientKey, { clientNode: clientNode ?? null, productIds: [] })
+      }
+      clientGroups.get(clientKey).productIds.push(product.id)
+
+      const tcEdge = edges.find(e => e.source === product.id && e.sourceHandle === 'bottom')
+      if (tcEdge) {
+        const tc = nodes.find(n => n.id === tcEdge.target)
+        if (tc) visibleIds.add(tc.id)
+      }
+    }
+
+    const layoutPositions = {}
+    let yOffset = 100
+    for (const { clientNode, productIds } of clientGroups.values()) {
+      if (clientNode) layoutPositions[clientNode.id] = { x: 100, y: yOffset }
+
+      for (let i = 0; i < productIds.length; i++) {
+        const pid = productIds[i]
+        const py  = yOffset + i * 240
+        layoutPositions[pid] = { x: 420, y: py }
+
+        const tcEdge = edges.find(e => e.source === pid && e.sourceHandle === 'bottom')
+        if (tcEdge && nodes.find(n => n.id === tcEdge.target)) {
+          layoutPositions[tcEdge.target] = { x: 420, y: py + 128 }  // 96 + 32
+        }
+      }
+      yOffset += Math.max(1, productIds.length) * 240 + 80
+    }
+
+    return { visibleIds, layoutPositions, count: matchingProducts.length }
+  }, [filterDates, nodes, edges])
+
+  // fitView sempre que o filtro muda (aplicado, limpo ou datas alteradas)
+  useEffect(() => {
+    if (!initialized) return
+    const t = setTimeout(() => fitView({ padding: 0.25, duration: 400 }), 200)
+    return () => clearTimeout(t)
+  }, [filterDates, fitView, initialized])
 
   // Global keyboard shortcuts (copy, paste, undo, redo)
   useEffect(() => {
@@ -132,60 +222,102 @@ export default function Canvas() {
     return () => document.removeEventListener('keydown', onKey)
   }, [copySelected, pasteClipboard, undo, redo])
 
-  // Injeta callbacks nos dados dos nodes sem serializar funções no estado
+  // Injeta callbacks nos dados dos nodes sem serializar funções no estado.
+  // Quando filtro ativo: esconde nodes fora do range e aplica posições de layout.
   const nodesWithCallbacks = useMemo(
     () =>
       nodes.map((n) => {
+        // Filtro: esconde nodes fora do conjunto visível
+        if (filterData && !filterData.visibleIds.has(n.id)) {
+          return { ...n, hidden: true }
+        }
+
+        // Posição de display: override durante filtro, real caso contrário
+        const pos = filterData
+          ? (filterPositions[n.id] ?? filterData.layoutPositions[n.id] ?? n.position)
+          : n.position
+
+        // Durante filtro, desliga border-merging (layout limpo)
+        const touchingSides = filterData ? {} : undefined
+
         if (n.type === 'systemNode') {
           return {
             ...n,
+            position: pos,
             data: {
               ...n.data,
-              touchingSides: getTouchingSides(n, nodes),
+              touchingSides: touchingSides ?? getTouchingSides(n, nodes),
               onAddNear: () => {
                 const node = getNode(n.id)
-                const pos = node
+                const p = node
                   ? { x: node.position.x + (node.measured?.width ?? 224) + 48, y: node.position.y }
                   : null
-                openAddModal(pos, n.id)
+                openAddModal(p, n.id)
               },
               onResizeEnd: (x, y, w, h) => snapNodeToGrid(n.id, x, y, w, h),
             },
           }
         }
         if (n.type === 'stickyNote') {
-          return {
-            ...n,
-            data: { ...n.data, onUpdate: updateStickyNote },
-          }
+          return { ...n, position: pos, data: { ...n.data, onUpdate: updateStickyNote } }
         }
         if (n.type === 'textCard') {
           return {
             ...n,
+            position: pos,
             data: {
               ...n.data,
-              touchingSides: getTouchingSides(n, nodes),
+              touchingSides: touchingSides ?? getTouchingSides(n, nodes),
               onUpdate: updateStickyNote,
               onResizeEnd: (x, y, w, h) => snapTextCardGrid(n.id, x, y, w, h),
             },
           }
         }
-        return n
+        return { ...n, position: pos }
       }),
-    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid, snapTextCardGrid]
+    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid, snapTextCardGrid, filterData, filterPositions]
   )
 
   const edgesWithCallbacks = useMemo(
-    () => edges.map((e) => ({
-      ...e,
-      data: { ...e.data, onUpdate: updateEdge },
-    })),
-    [edges, updateEdge]
+    () => edges.map((e) => {
+      const base = { ...e, data: { ...e.data, onUpdate: updateEdge } }
+      if (filterData && (!filterData.visibleIds.has(e.source) || !filterData.visibleIds.has(e.target))) {
+        return { ...base, hidden: true }
+      }
+      return base
+    }),
+    [edges, updateEdge, filterData]
   )
+
+  // Durante o filtro, intercepta mudanças de posição para atualizar filterPositions
+  // em vez do estado real dos nodes (que nunca muda durante o filtro).
+  const handleNodesChange = useCallback((changes) => {
+    if (!filterData) { onNodesChange(changes); return }
+
+    const passThrough = []
+    const posUpdates  = {}
+
+    for (const c of changes) {
+      if (c.type === 'position' && c.position) {
+        posUpdates[c.id] = c.position
+        // Passa só o flag dragging para manter o estado interno do ReactFlow correto
+        passThrough.push({ type: 'position', id: c.id, dragging: c.dragging })
+      } else {
+        passThrough.push(c)
+      }
+    }
+
+    if (Object.keys(posUpdates).length > 0) {
+      setFilterPositions(prev => ({ ...prev, ...posUpdates }))
+    }
+    if (passThrough.length > 0) onNodesChange(passThrough)
+  }, [filterData, onNodesChange])
 
   // Detecta alinhamento durante drag e gera guias visuais.
   // Para textCards, detecta color-snap com nodes/cards tocados.
   const onNodeDrag = useCallback((_, draggingNode) => {
+    // Durante filtro: sem guias e sem color-snap
+    if (filterData) return
     // ── Alignment guides (systemNode only) ──────────────────────────────────
     if (draggingNode.type === 'systemNode') {
       const others = nodes.filter(
@@ -280,10 +412,12 @@ export default function Canvas() {
         snapCardColor(draggingNode.id, snapColor)
       }
     }
-  }, [nodes, snapCardColor])
+  }, [nodes, snapCardColor, filterData])
 
   const onNodeDragStop = useCallback((_, node) => {
     setGuides([])
+    // Durante filtro: sem edge-snap (o usuário organiza livremente)
+    if (filterData) return
 
     if (node?.type !== 'textCard') return
     delete snapColorRef.current[node.id]
@@ -332,7 +466,7 @@ export default function Canvas() {
     }
 
     if (bestX !== null) placeCardAtEdge(node.id, bestX, bestY)
-  }, [nodes, placeCardAtEdge])
+  }, [nodes, placeCardAtEdge, filterData])
 
   const onPaneContextMenu = useCallback(
     (e) => {
@@ -368,7 +502,7 @@ export default function Canvas() {
       <ReactFlow
         nodes={nodesWithCallbacks}
         edges={edgesWithCallbacks}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
@@ -429,6 +563,18 @@ export default function Canvas() {
           </button>
         </div>
       </ReactFlow>
+
+      <FilterBar
+        filterDates={filterDates}
+        onApply={applyFilter}
+        onClear={clearFilter}
+      />
+
+      {filterData?.count === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-white/25 text-sm">Nenhuma entrada no período selecionado</span>
+        </div>
+      )}
 
       <GuideLines guides={guides} />
 
