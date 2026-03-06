@@ -19,9 +19,9 @@ export default function SystemEdge({
 
   // Try smart routing first; fall back to standard bezier if no obstacle found
   const smartResult = useMemo(
-    () => computeSmartPath(sourceX, sourceY, targetX, targetY, source, target, nodes),
+    () => computeSmartPath(sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, source, target, nodes),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sourceX, sourceY, targetX, targetY, source, target,
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, source, target,
      // depend on node positions/sizes (stringify is cheap for ~20 nodes)
      // eslint-disable-next-line react-hooks/exhaustive-deps
      nodes.map(n => `${n.id}:${n.position.x},${n.position.y},${n.measured?.width},${n.measured?.height}`).join('|')]

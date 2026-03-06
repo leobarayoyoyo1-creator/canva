@@ -8,6 +8,7 @@ import {
   useReactFlow,
   SelectionMode,
   ConnectionLineType,
+  ConnectionMode,
 } from '@xyflow/react'
 import { Plus } from 'lucide-react'
 import SystemNode from './SystemNode'
@@ -361,6 +362,7 @@ export default function Canvas() {
         edgeTypes={edgeTypes}
         snapToGrid
         snapGrid={[SNAP_GRID, SNAP_GRID]}
+        connectionMode={ConnectionMode.Loose}
         connectionLineType={ConnectionLineType.Bezier}
         connectionLineStyle={{
           stroke: `${PRIMARY_COLOR}90`,

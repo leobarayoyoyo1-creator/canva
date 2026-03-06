@@ -49,11 +49,13 @@ function loadFromStorage() {
             style: { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, ...n.style },
           }))
         : INITIAL_NODES,
-      // migra edges antigas para o tipo customizado
+      // migra edges antigas para o tipo customizado e garante sourceHandle/targetHandle
       edges: parsedEdges.map((e) => ({
         ...e,
         type: 'system',
         data: { label: e.data?.label ?? '' },
+        sourceHandle: e.sourceHandle ?? 'right',
+        targetHandle: e.targetHandle ?? 'left',
       })),
     }
   } catch (e) {
@@ -196,7 +198,14 @@ export function useCanvasStore() {
     if (sourceNodeId) {
       setEdges((eds) => [
         ...eds,
-        { id: `e${sourceNodeId}-${newId}`, source: sourceNodeId, target: newId, ...EDGE_STYLE },
+        {
+          id: `e${sourceNodeId}-${newId}`,
+          source: sourceNodeId,
+          sourceHandle: 'right',
+          target: newId,
+          targetHandle: 'left',
+          ...EDGE_STYLE,
+        },
       ])
     }
     closeModal()

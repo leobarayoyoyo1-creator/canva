@@ -11,11 +11,15 @@
 const NODE_PADDING = 24  // clearance around each node
 
 export function computeSmartPath(
-  sourceX, sourceY,
-  targetX, targetY,
+  sourceX, sourceY, sourcePosition,
+  targetX, targetY, targetPosition,
   sourceNodeId, targetNodeId,
   nodes
 ) {
+  // Only apply smart routing for horizontal Right→Left connections.
+  // Top/Bottom handle connections are handled correctly by getBezierPath.
+  if (sourcePosition !== 'right' || targetPosition !== 'left') return null
+
   // Only handle clearly forward-going edges
   if (targetX - sourceX < 80) return null
 

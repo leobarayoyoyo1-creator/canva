@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Handle, Position, NodeResizer } from '@xyflow/react'
 import { Zap, Database, Layers, Server, Box, Plus } from 'lucide-react'
 import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
@@ -16,6 +16,10 @@ const BASE_HEIGHT = 96  // 96 = 3 × 32 → centers always on 16px grid
 
 export default function SystemNode({ data, selected, width }) {
   const [hovered, setHovered] = useState(false)
+  const hoverTimer = useRef(null)
+
+  const onEnter = () => { clearTimeout(hoverTimer.current); setHovered(true) }
+  const onLeave = () => { hoverTimer.current = setTimeout(() => setHovered(false), 120) }
 
   const category = CATEGORIES[data.category] ?? CATEGORIES.other
   const status   = STATUSES[data.status]    ?? STATUSES.unknown
@@ -41,8 +45,8 @@ export default function SystemNode({ data, selected, width }) {
   return (
     <div
       className="relative w-full h-full"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
     >
       <NodeResizer
         isVisible={selected}
@@ -64,8 +68,10 @@ export default function SystemNode({ data, selected, width }) {
         }}
       />
 
-      <Handle type="target" position={Position.Left}  style={handleStyle} />
-      <Handle type="source" position={Position.Right} style={handleStyle} />
+      <Handle id="left"   type="source" position={Position.Left}   style={handleStyle} />
+      <Handle id="right"  type="source" position={Position.Right}  style={handleStyle} />
+      <Handle id="top"    type="source" position={Position.Top}    style={handleStyle} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={handleStyle} />
 
       {/* Inner content rendered at BASE dimensions and scaled via CSS transform.
           pointerEvents:none so mouse events reach the outer div for hover tracking. */}
@@ -149,6 +155,8 @@ export default function SystemNode({ data, selected, width }) {
           e.stopPropagation()
           data.onAddNear?.()
         }}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
         className="absolute top-1/2 flex items-center justify-center rounded-full text-white shadow-xl transition-all duration-200"
         style={{
           width: 24 * scale,
@@ -157,7 +165,7 @@ export default function SystemNode({ data, selected, width }) {
           transform: 'translateY(-50%)',
           background: PRIMARY_COLOR,
           opacity: hovered ? 1 : 0,
-          pointerEvents: hovered ? 'auto' : 'none',
+          pointerEvents: 'auto',
           boxShadow: `0 0 12px ${PRIMARY_COLOR}60`,
         }}
         title="Adicionar sistema conectado"
