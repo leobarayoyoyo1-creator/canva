@@ -125,6 +125,9 @@ export default function Canvas() {
   // Tracks last snapped color per textCard during drag — avoids redundant setNodes calls
   const snapColorRef = useRef({})
 
+  // Tracks canvas mouse position (flow coords) for cursor-aware paste
+  const mousePosRef = useRef(null)
+
   // ── Filter state ────────────────────────────────────────────────────────────
   const [filterDates, setFilterDates] = useState(() => {
     try {
@@ -221,7 +224,10 @@ export default function Canvas() {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return   // don't intercept text editing
       if (!(e.ctrlKey || e.metaKey)) return
       if (e.key === 'c') { e.preventDefault(); copySelected() }
-      if (e.key === 'v') { e.preventDefault(); pasteClipboard() }
+      if (e.key === 'v') {
+        e.preventDefault()
+        pasteClipboard(mousePosRef.current ?? screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }))
+      }
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
     }
@@ -547,6 +553,7 @@ export default function Canvas() {
         onPaneContextMenu={onPaneContextMenu}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={closeContextMenu}
+        onMouseMove={(e) => { mousePosRef.current = screenToFlowPosition({ x: e.clientX, y: e.clientY }) }}
       >
         <Background
           variant={BackgroundVariant.Dots}

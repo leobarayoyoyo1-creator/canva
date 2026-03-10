@@ -321,13 +321,27 @@ export function useCanvasStore() {
     pasteCountRef.current = 0
   }, [nodes, edges])
 
-  const pasteClipboard = useCallback(() => {
+  const pasteClipboard = useCallback((targetPos = null) => {
     const { nodes: cbNodes, edges: cbEdges } = clipboardRef.current
     if (!cbNodes.length) return
     snapshot()
 
     pasteCountRef.current += 1
-    const offset = SNAP_GRID * 2 * pasteCountRef.current  // 32px per paste step
+    const snap = (v) => Math.round(v / SNAP_GRID) * SNAP_GRID
+    const nudge = SNAP_GRID * 2 * (pasteCountRef.current - 1)  // each repeated paste shifts 32px
+
+    let xOff, yOff
+    if (targetPos) {
+      const xs = cbNodes.map((n) => n.position.x)
+      const ys = cbNodes.map((n) => n.position.y)
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+      xOff = targetPos.x - cx + nudge
+      yOff = targetPos.y - cy + nudge
+    } else {
+      const offset = SNAP_GRID * 2 * pasteCountRef.current
+      xOff = offset; yOff = offset
+    }
 
     // Map old IDs → new IDs
     const idMap = {}
@@ -339,8 +353,8 @@ export function useCanvasStore() {
         id: newId,
         selected: true,
         position: {
-          x: n.position.x + offset,
-          y: n.position.y + offset,
+          x: snap(n.position.x + xOff),
+          y: snap(n.position.y + yOff),
         },
       }
     })
