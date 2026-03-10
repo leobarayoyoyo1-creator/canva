@@ -16,7 +16,7 @@ const CATEGORY_ICONS = {
 const BASE_WIDTH  = 224
 const BASE_HEIGHT = 96  // 96 = 3 × 32 → centers always on 16px grid
 
-export default function SystemNode({ data, selected, width }) {
+export default function SystemNode({ data, selected, width, height }) {
   const [hovered, setHovered] = useState(false)
   const hoverTimer = useRef(null)
 
@@ -29,6 +29,8 @@ export default function SystemNode({ data, selected, width }) {
   const ts       = data.touchingSides ?? { left: false, right: false, top: false, bottom: false }
 
   const scale = (width ?? BASE_WIDTH) / BASE_WIDTH
+  // Height of the scaled inner div in unscaled CSS units — extends below header to fill the node
+  const scaledInnerHeight = Math.max(BASE_HEIGHT, Math.round((height ?? BASE_HEIGHT + 64) / scale))
 
   // Remove transform here — React Flow's CSS positions handles via translate(-50%,-50%)
   // and any inline transform would override that, causing misalignment after resize
@@ -49,6 +51,27 @@ export default function SystemNode({ data, selected, width }) {
       className="relative w-full h-full"
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
+      style={{
+        background: '#1e1e2e',
+        borderStyle: 'solid',
+        borderTopWidth:    ts.top    ? 0 : 1,
+        borderRightWidth:  ts.right  ? 0 : 1,
+        borderBottomWidth: ts.bottom ? 0 : 1,
+        borderLeftWidth:   ts.left   ? 0 : 1,
+        borderColor: selected
+          ? `${category.color}90`
+          : hovered
+          ? `${category.color}60`
+          : 'rgba(255,255,255,0.07)',
+        borderTopLeftRadius:     ts.topLeft     ? 0 : 12,
+        borderTopRightRadius:    ts.topRight    ? 0 : 12,
+        borderBottomRightRadius: ts.bottomRight ? 0 : 12,
+        borderBottomLeftRadius:  ts.bottomLeft  ? 0 : 12,
+        boxShadow: hovered || selected
+          ? `0 10px 36px #00000065`
+          : '0 4px 16px #00000040',
+        transition: 'border-color 0.15s, box-shadow 0.15s, border-radius 0.1s',
+      }}
     >
       <NodeResizer
         isVisible={selected}
@@ -76,6 +99,7 @@ export default function SystemNode({ data, selected, width }) {
       <Handle id="bottom" type="source" position={Position.Bottom} style={handleStyle} />
 
       {/* Inner content rendered at BASE dimensions and scaled via CSS transform.
+          Height extends beyond BASE_HEIGHT when text is present so the text scales too.
           pointerEvents:none so mouse events reach the outer div for hover tracking. */}
       <div
         style={{
@@ -83,37 +107,22 @@ export default function SystemNode({ data, selected, width }) {
           top: 0,
           left: 0,
           width: BASE_WIDTH,
-          height: BASE_HEIGHT,
+          height: scaledInnerHeight,
           transformOrigin: 'top left',
           transform: `scale(${scale})`,
           pointerEvents: 'none',
         }}
       >
+        {/* Header section — fixed BASE_HEIGHT, clips color bar at rounded corners */}
         <div
           className="overflow-hidden flex flex-col"
           style={{
             width: '100%',
-            height: '100%',
-            borderStyle: 'solid',
-            borderTopWidth:    ts.top    ? 0 : 1,
-            borderRightWidth:  ts.right  ? 0 : 1,
-            borderBottomWidth: ts.bottom ? 0 : 1,
-            borderLeftWidth:   ts.left   ? 0 : 1,
-            borderColor: selected
-              ? `${category.color}90`
-              : hovered
-              ? `${category.color}60`
-              : 'rgba(255,255,255,0.07)',
+            height: BASE_HEIGHT,
             borderTopLeftRadius:     ts.topLeft     ? 0 : 12,
             borderTopRightRadius:    ts.topRight    ? 0 : 12,
             borderBottomRightRadius: ts.bottomRight ? 0 : 12,
             borderBottomLeftRadius:  ts.bottomLeft  ? 0 : 12,
-            background: '#1e1e2e',
-            // Remove the 1px glow ring on touching sides — it bleeds through the junction
-            boxShadow: hovered || selected
-              ? `0 10px 36px #00000065`
-              : '0 4px 16px #00000040',
-            transition: 'border-color 0.15s, box-shadow 0.15s, border-radius 0.1s',
           }}
         >
           <div className="shrink-0 h-1" style={{ background: category.color }} />
@@ -149,27 +158,24 @@ export default function SystemNode({ data, selected, width }) {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Text section: shown below the scaled content when data.text is present.
-          Positioned absolutely so it naturally fills whatever space remains.
-          pointerEvents:none so clicks/drag still reach the outer div. */}
-      {data.text && (
-        <div
-          className="absolute left-0 right-0 overflow-hidden pointer-events-none"
-          style={{ top: Math.round(BASE_HEIGHT * scale), bottom: 0 }}
-        >
-          <div className="h-px mx-3" style={{ background: 'rgba(255,255,255,0.06)' }} />
-          <div className="px-3 pt-2 pb-1">
-            <span
-              className="block text-sm font-semibold leading-snug line-clamp-3"
-              style={{ color: 'rgba(255,255,255,0.55)' }}
-            >
-              {data.text}
-            </span>
+        {/* Text section: inside the scaled div so it grows/shrinks with the node */}
+        {data.text && (
+          <div
+            style={{ position: 'absolute', top: BASE_HEIGHT, left: 0, right: 0 }}
+          >
+            <div className="h-px mx-3" style={{ background: 'rgba(255,255,255,0.06)' }} />
+            <div className="px-3 pt-2 pb-1">
+              <span
+                className="block text-sm font-semibold leading-snug"
+                style={{ color: 'rgba(255,255,255,0.55)', whiteSpace: 'pre-wrap' }}
+              >
+                {data.text}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* + button: outside the scaled content, sized and positioned proportionally */}
       <button

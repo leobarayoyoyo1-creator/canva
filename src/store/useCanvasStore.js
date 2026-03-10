@@ -276,7 +276,26 @@ export function useCanvasStore() {
   const updateNode = useCallback((id, data) => {
     snapshot()
     setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n))
+      nds.map((n) => {
+        if (n.id !== id) return n
+        const merged = { ...n.data, ...data }
+        const currentWidth = n.style?.width ?? DEFAULT_NODE_WIDTH
+        const scale = currentWidth / DEFAULT_NODE_WIDTH
+        let newHeight
+        if (merged.text) {
+          const lines = merged.text.split('\n').length
+          // 1-2 lines: use fixed 64px text area (breathing room, same as addNode)
+          // 3+ lines: expand to fit — 13px overhead + 19px per line
+          const textArea = lines >= 3 ? (13 + lines * 19) : 64
+          const unscaled = DEFAULT_NODE_HEIGHT + textArea
+          newHeight = Math.ceil((unscaled * scale) / SNAP_GRID) * SNAP_GRID
+        } else {
+          newHeight = Math.round((DEFAULT_NODE_HEIGHT * scale) / SNAP_GRID) * SNAP_GRID
+        }
+        // height must be set at top-level AND in style: React Flow's inlineDimensions
+        // uses node.height (top-level) first, which overrides node.style.height in the wrapper
+        return { ...n, data: merged, height: newHeight, style: { ...n.style, height: newHeight } }
+      })
     )
     closeModal()
   }, [snapshot, closeModal])
