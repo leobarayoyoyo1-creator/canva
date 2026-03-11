@@ -18,19 +18,40 @@ db.exec(`
   INSERT OR IGNORE INTO canvas (id, nodes, edges) VALUES (1, '[]', '[]');
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS categories (
+    key        TEXT PRIMARY KEY,
+    label      TEXT NOT NULL,
+    color      TEXT NOT NULL DEFAULT '#6b7280',
+    icon       TEXT NOT NULL DEFAULT 'Box',
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+`)
+
+// Seed default categories if table is empty
+const catCount = db.prepare('SELECT COUNT(*) as c FROM categories').get()
+if (catCount.c === 0) {
+  const ins = db.prepare('INSERT INTO categories (key, label, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)')
+  ;[
+    ['client',   'Cliente',         '#3b82f6', 'User',     0],
+    ['product',  'Produto',         '#f97316', 'Wrench',   1],
+    ['api',      'API',             '#6366f1', 'Zap',      2],
+    ['database', 'Banco de Dados',  '#10b981', 'Database',  3],
+    ['queue',    'Fila',            '#f59e0b', 'Layers',   4],
+    ['service',  'Serviço',         '#8b5cf6', 'Server',   5],
+    ['other',    'Outro',           '#6b7280', 'Box',      6],
+  ].forEach(row => ins.run(...row))
+}
+
 const getCanvas  = db.prepare('SELECT nodes, edges FROM canvas WHERE id = 1')
 const saveCanvas = db.prepare('UPDATE canvas SET nodes = ?, edges = ? WHERE id = 1')
 
-// ── Canvas constants (espelhados do frontend) ─────────────────────────────────
-const CATEGORIES = {
-  client:   { color: '#3b82f6' },
-  product:  { color: '#f97316' },
-  api:      { color: '#6366f1' },
-  database: { color: '#10b981' },
-  queue:    { color: '#f59e0b' },
-  service:  { color: '#8b5cf6' },
-  other:    { color: '#6b7280' },
-}
+const getCategories   = db.prepare('SELECT * FROM categories ORDER BY sort_order, key')
+const insertCategory  = db.prepare('INSERT INTO categories (key, label, color, icon, sort_order) VALUES (?, ?, ?, ?, ?)')
+const updateCategoryQ = db.prepare('UPDATE categories SET label = ?, color = ?, icon = ? WHERE key = ?')
+const deleteCategoryQ = db.prepare('DELETE FROM categories WHERE key = ?')
+
+// ── Canvas constants ──────────────────────────────────────────────────────────
 const PRIMARY_COLOR       = '#6366f1'
 const SNAP_GRID           = 16
 const DEFAULT_NODE_WIDTH  = 224
@@ -217,6 +238,36 @@ app.post('/api/webhook/entrada', (req, res) => {
   broadcast('canvas-update', { nodes: updatedNodes, edges: updatedEdges })
 
   res.json({ ok: true, clientes_conectados: sseClients.length })
+})
+
+// ── Category CRUD ─────────────────────────────────────────────────────────────
+app.get('/api/categories', (_req, res) => {
+  res.json(getCategories.all())
+})
+
+app.post('/api/categories', (req, res) => {
+  const { key, label, color, icon } = req.body
+  if (!key || !label) return res.status(400).json({ error: 'key e label são obrigatórios' })
+  const max = db.prepare('SELECT COALESCE(MAX(sort_order), -1) as m FROM categories').get()
+  try {
+    insertCategory.run(key, label, color ?? '#6b7280', icon ?? 'Box', max.m + 1)
+    res.json({ ok: true })
+  } catch {
+    res.status(409).json({ error: 'Categoria já existe com essa chave' })
+  }
+})
+
+app.put('/api/categories/:key', (req, res) => {
+  const { label, color, icon } = req.body
+  const existing = db.prepare('SELECT * FROM categories WHERE key = ?').get(req.params.key)
+  if (!existing) return res.status(404).json({ error: 'Categoria não encontrada' })
+  updateCategoryQ.run(label ?? existing.label, color ?? existing.color, icon ?? existing.icon, req.params.key)
+  res.json({ ok: true })
+})
+
+app.delete('/api/categories/:key', (req, res) => {
+  deleteCategoryQ.run(req.params.key)
+  res.json({ ok: true })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

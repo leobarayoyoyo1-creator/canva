@@ -11,7 +11,7 @@ import {
   ConnectionLineType,
   ConnectionMode,
 } from '@xyflow/react'
-import { Plus, LayoutGrid } from 'lucide-react'
+import { Plus, LayoutGrid, Palette } from 'lucide-react'
 import SystemNode from './SystemNode'
 import SystemEdge from './SystemEdge'
 import StickyNote from './StickyNote'
@@ -19,7 +19,8 @@ import TextCard from './TextCard'
 import GuideLines from './GuideLines'
 import NodeModal from './NodeModal'
 import ContextMenu from './ContextMenu'
-import { useCanvasStore, CATEGORIES, PRIMARY_COLOR, SNAP_GRID, NODE_DIMS } from '../store/useCanvasStore'
+import CategoryManager from './CategoryManager'
+import { useCanvasStore, PRIMARY_COLOR, SNAP_GRID, NODE_DIMS } from '../store/useCanvasStore'
 import { useWebhookListener } from '../hooks/useWebhookListener'
 import { computeAutoLayout } from '../utils/autoLayout'
 
@@ -114,6 +115,7 @@ export default function Canvas() {
     undo, redo,
     setCanvasFromServer,
     applyLayout,
+    categories, addCategory, editCategory, removeCategory,
   } = useCanvasStore()
 
   useWebhookListener(setCanvasFromServer)
@@ -121,6 +123,7 @@ export default function Canvas() {
   const { getNode, screenToFlowPosition, fitView } = useReactFlow()
 
   const [guides, setGuides] = useState([])
+  const [showCategories, setShowCategories] = useState(false)
 
   // Tracks last snapped color per textCard during drag — avoids redundant setNodes calls
   const snapColorRef = useRef({})
@@ -254,11 +257,15 @@ export default function Canvas() {
         const touchingSides = filterData ? {} : undefined
 
         if (n.type === 'systemNode') {
+          const cat = categories[n.data.category] ?? { label: n.data.category ?? 'Outro', color: '#6b7280', icon: 'Box' }
           return {
             ...n,
             position: pos,
             data: {
               ...n.data,
+              categoryColor: cat.color,
+              categoryLabel: cat.label,
+              categoryIcon: cat.icon,
               touchingSides: touchingSides ?? getTouchingSides(n, nodes),
               onAddNear: () => {
                 const node = getNode(n.id)
@@ -288,7 +295,7 @@ export default function Canvas() {
         }
         return { ...n, position: pos }
       }),
-    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid, snapTextCardGrid, filterData, filterPositions]
+    [nodes, getNode, openAddModal, updateStickyNote, snapNodeToGrid, snapTextCardGrid, filterData, filterPositions, categories]
   )
 
   const edgesWithCallbacks = useMemo(
@@ -405,7 +412,7 @@ export default function Canvas() {
       for (const n of nodes) {
         if (n.id === draggingNode.id || n.type !== 'systemNode') continue
         if (touches(n)) {
-          snapColor = CATEGORIES[n.data?.category]?.color ?? CATEGORIES.other.color
+          snapColor = categories[n.data?.category]?.color ?? '#6b7280'
           break
         }
       }
@@ -571,7 +578,7 @@ export default function Canvas() {
           nodeColor={(n) => {
             if (n.type === 'stickyNote') return '#fde047'
             if (n.type === 'textCard')   return n.data?.accentColor ?? PRIMARY_COLOR
-            return CATEGORIES[n.data?.category]?.color ?? CATEGORIES.other.color
+            return categories[n.data?.category]?.color ?? '#6b7280'
           }}
           maskColor="rgba(0,0,0,0.6)"
           style={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -594,6 +601,15 @@ export default function Canvas() {
           >
             <LayoutGrid size={14} />
             Organizar
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowCategories(true) }}
+            className="flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium text-white/70 shadow-xl transition-all hover:text-white hover:brightness-110 active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
+            title="Gerenciar categorias"
+          >
+            <Palette size={14} />
+            Categorias
           </button>
         </div>
       </ReactFlow>
@@ -636,12 +652,23 @@ export default function Canvas() {
         <NodeModal
           mode={modal.mode}
           initialData={modalNode?.data}
+          categories={categories}
           onSave={(data) => {
             if (modal.mode === 'add') addNode(data, modal.position, modal.sourceNodeId)
             else updateNode(modal.nodeId, data)
           }}
           onDelete={modal.nodeId ? () => deleteNode(modal.nodeId) : undefined}
           onClose={closeModal}
+        />
+      )}
+
+      {showCategories && (
+        <CategoryManager
+          categories={categories}
+          onAdd={addCategory}
+          onEdit={editCategory}
+          onRemove={removeCategory}
+          onClose={() => setShowCategories(false)}
         />
       )}
     </div>

@@ -1,17 +1,8 @@
 import { useState, useRef } from 'react'
 import { Handle, Position, NodeResizer } from '@xyflow/react'
-import { Zap, Database, Layers, Server, Box, Plus, User, Wrench } from 'lucide-react'
-import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
-
-const CATEGORY_ICONS = {
-  client:   User,
-  product:  Wrench,
-  api:      Zap,
-  database: Database,
-  queue:    Layers,
-  service:  Server,
-  other:    Box,
-}
+import { Plus } from 'lucide-react'
+import { STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
+import { getIcon } from '../utils/iconRegistry'
 
 const BASE_WIDTH  = 224
 const BASE_HEIGHT = 96  // 96 = 3 × 32 → centers always on 16px grid
@@ -23,9 +14,10 @@ export default function SystemNode({ data, selected, width, height }) {
   const onEnter = () => { clearTimeout(hoverTimer.current); setHovered(true) }
   const onLeave = () => { hoverTimer.current = setTimeout(() => setHovered(false), 120) }
 
-  const category = CATEGORIES[data.category] ?? CATEGORIES.other
+  const catColor = data.categoryColor ?? '#6b7280'
+  const catLabel = data.categoryLabel ?? data.category ?? 'Outro'
+  const Icon     = getIcon(data.categoryIcon)
   const status   = STATUSES[data.status]    ?? STATUSES.unknown
-  const Icon     = CATEGORY_ICONS[data.category] ?? Box
   const ts       = data.touchingSides ?? { left: false, right: false, top: false, bottom: false }
 
   const scale = (width ?? BASE_WIDTH) / BASE_WIDTH
@@ -39,10 +31,10 @@ export default function SystemNode({ data, selected, width, height }) {
     width: handleSize,
     height: handleSize,
     background: '#1e1e2e',
-    border: `${Math.max(1.5, 2.5 * scale)}px solid ${category.color}`,
+    border: `${Math.max(1.5, 2.5 * scale)}px solid ${catColor}`,
     opacity: hovered ? 1 : 0,
     transition: 'opacity 0.18s, box-shadow 0.18s',
-    boxShadow: hovered ? `0 0 0 4px ${category.color}20, 0 0 12px ${category.color}50` : 'none',
+    boxShadow: hovered ? `0 0 0 4px ${catColor}20, 0 0 12px ${catColor}50` : 'none',
     cursor: 'crosshair',
   }
 
@@ -59,9 +51,9 @@ export default function SystemNode({ data, selected, width, height }) {
         borderBottomWidth: ts.bottom ? 0 : 1,
         borderLeftWidth:   ts.left   ? 0 : 1,
         borderColor: selected
-          ? `${category.color}90`
+          ? `${catColor}90`
           : hovered
-          ? `${category.color}60`
+          ? `${catColor}60`
           : 'rgba(255,255,255,0.07)',
         borderTopLeftRadius:     ts.topLeft     ? 0 : 12,
         borderTopRightRadius:    ts.topRight    ? 0 : 12,
@@ -125,15 +117,15 @@ export default function SystemNode({ data, selected, width, height }) {
             borderBottomLeftRadius:  ts.bottomLeft  ? 0 : 12,
           }}
         >
-          <div className="shrink-0 h-1" style={{ background: category.color }} />
+          <div className="shrink-0 h-1" style={{ background: catColor }} />
 
           <div className="flex-1 px-4 py-3.5 flex flex-col justify-center gap-3 min-h-0">
             <div className="flex items-center gap-3">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: `${category.color}20` }}
+                style={{ background: `${catColor}20` }}
               >
-                <Icon size={16} style={{ color: category.color }} />
+                <Icon size={16} style={{ color: catColor }} />
               </div>
               <span className="text-white font-semibold text-sm leading-tight">
                 {data.name}
@@ -143,9 +135,9 @@ export default function SystemNode({ data, selected, width, height }) {
             <div className="flex items-center justify-between">
               <span
                 className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: `${category.color}18`, color: category.color }}
+                style={{ background: `${catColor}18`, color: catColor }}
               >
-                {category.label}
+                {catLabel}
               </span>
 
               <div className="flex items-center gap-1.5">

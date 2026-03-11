@@ -16,14 +16,14 @@ function persistCanvas(nodes, edges) {
   }).catch(console.error)
 }
 
-export const CATEGORIES = {
-  client:   { label: 'Cliente',       color: '#3b82f6' },
-  product:  { label: 'Produto',       color: '#f97316' },
-  api:      { label: 'API',           color: '#6366f1' },
-  database: { label: 'Banco de Dados', color: '#10b981' },
-  queue:    { label: 'Fila',          color: '#f59e0b' },
-  service:  { label: 'Serviço',       color: '#8b5cf6' },
-  other:    { label: 'Outro',         color: '#6b7280' },
+const DEFAULT_CATEGORIES = {
+  client:   { label: 'Cliente',       color: '#3b82f6', icon: 'User' },
+  product:  { label: 'Produto',       color: '#f97316', icon: 'Wrench' },
+  api:      { label: 'API',           color: '#6366f1', icon: 'Zap' },
+  database: { label: 'Banco de Dados', color: '#10b981', icon: 'Database' },
+  queue:    { label: 'Fila',          color: '#f59e0b', icon: 'Layers' },
+  service:  { label: 'Serviço',       color: '#8b5cf6', icon: 'Server' },
+  other:    { label: 'Outro',         color: '#6b7280', icon: 'Box' },
 }
 
 export const STATUSES = {
@@ -96,6 +96,7 @@ export function useCanvasStore() {
 
   const [nodes, setNodes] = useState([])
   const [edges, setEdges] = useState([])
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES)
   const [initialized, setInitialized] = useState(false)
 
   // modal: { open, mode: 'add'|'edit', nodeId, position, sourceNodeId }
@@ -117,7 +118,7 @@ export function useCanvasStore() {
   // Keep latestRef in sync so snapshot() always sees the most recent state
   useEffect(() => { latestRef.current = { nodes, edges } }, [nodes, edges])
 
-  // Load canvas from server on mount
+  // Load canvas + categories from server on mount
   useEffect(() => {
     fetchCanvas()
       .then(({ nodes: n, edges: e }) => {
@@ -131,6 +132,15 @@ export function useCanvasStore() {
         setNodes(INITIAL_NODES)
       })
       .finally(() => setInitialized(true))
+
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(cats => {
+        const obj = {}
+        for (const c of cats) obj[c.key] = { label: c.label, color: c.color, icon: c.icon }
+        setCategories(obj)
+      })
+      .catch(() => setCategories(DEFAULT_CATEGORIES))
   }, [])
 
   // Persist to server (debounced 1 s) whenever canvas changes
@@ -480,6 +490,35 @@ export function useCanvasStore() {
     setEdges(loadedEdges)
   }, [snapshot])
 
+  // Category CRUD ──────────────────────────────────────────────────────────────
+  const addCategory = useCallback(async ({ key, label, color, icon }) => {
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, label, color, icon }),
+    })
+    if (!res.ok) throw new Error('Falha ao criar categoria')
+    setCategories(prev => ({ ...prev, [key]: { label, color, icon } }))
+  }, [])
+
+  const editCategory = useCallback(async (key, patch) => {
+    await fetch(`/api/categories/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    setCategories(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }, [])
+
+  const removeCategory = useCallback(async (key) => {
+    await fetch(`/api/categories/${key}`, { method: 'DELETE' })
+    setCategories(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }, [])
+
   // Aplica um mapa de posições calculado por computeAutoLayout ao estado real dos nodes.
   const applyLayout = useCallback((positionMap) => {
     snapshot()
@@ -494,6 +533,7 @@ export function useCanvasStore() {
   return {
     nodes, edges,
     initialized,
+    categories, addCategory, editCategory, removeCategory,
     onNodesChange, onEdgesChange, onConnect,
     modal, openAddModal, openEditModal, closeModal,
     contextMenu, openContextMenu, closeContextMenu,

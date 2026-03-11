@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { CATEGORIES, STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
+import { STATUSES, PRIMARY_COLOR } from '../store/useCanvasStore'
 import { Trash2 } from 'lucide-react'
 
-export default function NodeModal({ mode = 'add', initialData, onSave, onDelete, onClose }) {
+export default function NodeModal({ mode = 'add', initialData, categories = {}, onSave, onDelete, onClose }) {
+  const categoryKeys = Object.keys(categories)
+  const defaultCategory = categoryKeys.includes('api') ? 'api' : categoryKeys[0] ?? 'other'
   const [name,     setName]     = useState(initialData?.name     ?? '')
-  const [category, setCategory] = useState(initialData?.category ?? 'api')
+  const [category, setCategory] = useState(initialData?.category ?? defaultCategory)
   const [status,   setStatus]   = useState(initialData?.status   ?? 'active')
   const [text,     setText]     = useState(initialData?.text     ?? '')
 
@@ -38,7 +40,7 @@ export default function NodeModal({ mode = 'add', initialData, onSave, onDelete,
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-white/40 uppercase tracking-wider">Categoria</label>
             <div className="grid grid-cols-2 gap-2">
-              {Object.entries(CATEGORIES).map(([key, { label, color }]) => (
+              {Object.entries(categories).map(([key, { label, color }]) => (
                 <button
                   key={key}
                   type="button"
