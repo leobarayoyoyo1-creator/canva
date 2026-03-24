@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(curl:*)",
+      "Bash(rm:*)",
+      "Bash(ipconfig:*)",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(kill:*)",
+      "Bash(npx:*)",
+      "Bash(npm start:*)",
+      "Bash(netstat -ano | findstr \":3001\")"
+    ]
+  }
+}
